@@ -1,0 +1,12 @@
+node_modules/
+*.log
+*.db
+.DS_Store
+docs/superpowers/
+
+# Packaged extension artifacts and signing keys stay local.
+extension.crx
+extension.pem
+
+# Personal config (landing page patterns, etc.) — never push to GitHub
+extension/config.local.js
