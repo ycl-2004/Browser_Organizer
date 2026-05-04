@@ -1471,8 +1471,8 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 7px;
 }
 
 .panel-heading h2,
@@ -1493,7 +1493,7 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
 }
 
 .eyebrow {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   color: var(--accent-amber);
   font-size: 8px;
   font-weight: 700;
@@ -1510,11 +1510,11 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
 }
 
 .hero-section {
-  min-height: 220px;
+  min-height: 148px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: clamp(18px, 3.8vw, 28px) clamp(18px, 4vw, 30px);
+  padding: clamp(12px, 2.6vw, 18px) clamp(18px, 4vw, 30px);
   overflow: hidden;
   position: relative;
 }
@@ -1545,7 +1545,7 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 5px;
   color: var(--accent-amber);
 }
 
@@ -1586,7 +1586,7 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
 .hero-rule {
   width: 28px;
   height: 2px;
-  margin: 12px 0 12px;
+  margin: 8px 0 8px;
   background: var(--accent-amber);
 }
 
@@ -1830,7 +1830,9 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .tabs-column .mission-card {
@@ -1838,6 +1840,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   padding: 12px;
   gap: 6px;
   background: var(--card-bg);
+  flex: 0 0 auto;
 }
 
 .tabs-column .mission-card::before {
@@ -2204,7 +2207,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 }
 
 .todo-panel .panel-heading h2 {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .todo-panel .eyebrow {
@@ -2215,35 +2218,42 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   border-top: 1px solid rgba(154, 145, 138, 0.14);
 }
 
+.todo-list-compact {
+  flex: 0 0 auto;
+  min-height: 185px;
+  max-height: 185px;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--warm-gray);
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+}
+
 .todo-item {
-  min-height: 32px;
+  min-height: 34px;
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto 18px;
+  grid-template-columns: 18px minmax(0, 1fr) auto 18px;
   gap: 8px;
   align-items: center;
   border-bottom: 1px solid rgba(154, 145, 138, 0.14);
 }
 
-.todo-check {
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--warm-gray);
-  background: transparent;
-  cursor: pointer;
-}
-
-.todo-check:hover {
-  border-color: var(--accent-sage);
-  background: rgba(90, 122, 98, 0.08);
-}
-
-.todo-text {
+.todo-title {
   min-width: 0;
   color: var(--ink);
-  font-size: 11px;
+  font-size: 12.5px;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.daily-task-row {
+  min-height: 40px;
+}
+
+.daily-task-row.is-done .todo-title {
+  color: var(--muted);
+  text-decoration: line-through;
 }
 
 .todo-tag {
@@ -2254,7 +2264,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   font-size: 8.5px;
 }
 
-.todo-remove {
+.todo-delete {
   border: none;
   background: transparent;
   color: var(--muted);
@@ -2263,8 +2273,24 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   cursor: pointer;
 }
 
-.todo-remove:hover {
+.todo-delete:hover {
   color: var(--accent-rose);
+}
+
+.todo-check-wrap {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.todo-check-wrap input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent-amber);
 }
 
 .todo-empty {
@@ -2276,6 +2302,25 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.todo-more-row {
+  width: 100%;
+  margin-top: 6px;
+  flex-shrink: 0;
+  border: 1px solid rgba(200, 113, 58, 0.2);
+  background: rgba(200, 113, 58, 0.05);
+  color: var(--accent-amber);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.todo-more-row:hover {
+  border-color: var(--accent-amber);
 }
 
 .todo-form {
@@ -2317,6 +2362,181 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 
 .todo-form button:hover {
   color: var(--accent-amber);
+}
+
+.daily-planner {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(240px, 0.95fr) minmax(260px, 1.05fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.daily-planner-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.daily-planner-header h3 {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  line-height: 1.05;
+}
+
+.planner-nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.planner-nav button {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--warm-gray);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.planner-nav button:hover:not(:disabled) {
+  border-color: var(--accent-amber);
+  color: var(--accent-amber);
+}
+
+.planner-nav button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.calendar-grid {
+  align-self: start;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar-weekday {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 4px 0;
+}
+
+.calendar-day {
+  min-height: 44px;
+  border: 1px solid var(--warm-gray);
+  background: rgba(255, 253, 249, 0.55);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+[data-theme="dark"] .calendar-day {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.calendar-day:hover:not(:disabled) {
+  border-color: var(--accent-amber);
+  background: rgba(200, 113, 58, 0.05);
+}
+
+.calendar-day.is-selected {
+  border-color: var(--accent-amber);
+  background: rgba(200, 113, 58, 0.1);
+}
+
+.calendar-day.is-today span {
+  color: var(--accent-amber);
+  font-weight: 600;
+}
+
+.calendar-day > span {
+  line-height: 1;
+}
+
+.calendar-day small {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  font-size: 8.5px;
+  line-height: 1;
+  color: var(--accent-amber);
+}
+
+.calendar-day:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.calendar-day.is-empty {
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.selected-day-panel {
+  min-height: 0;
+  border: 1px solid var(--warm-gray);
+  background: rgba(255, 253, 249, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+
+[data-theme="dark"] .selected-day-panel {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.selected-day-header {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--warm-gray);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.selected-day-header span {
+  font-weight: 600;
+}
+
+.selected-day-header small {
+  color: var(--muted);
+}
+
+.selected-day-tasks {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+.selected-day-empty {
+  padding: 10px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.selected-day-form {
+  flex-shrink: 0;
+  border-top: 1px solid var(--warm-gray);
 }
 
 .domain-collapse-btn {
@@ -2390,36 +2610,57 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 
 .todo-panel-expanded {
   flex: 1;
-  min-height: clamp(280px, 34vh, 420px);
+  min-height: clamp(560px, 62vh, 760px);
   display: flex;
   flex-direction: column;
 }
 
-.todo-panel-expanded .panel-heading,
-.todo-panel-expanded .todo-form {
+.todo-panel-expanded .panel-heading {
   flex-shrink: 0;
 }
 
-.todo-panel-expanded .todo-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
 .tabs-column {
+  --bookmarks-panel-height: clamp(220px, calc(100vh - 520px), 360px);
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
 .tabs-column > * {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   flex-shrink: 0;
 }
 
 .tabs-column .active-subsection {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#openTabsSubSection {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#openTabsSubSection #openTabsMissions {
+  flex: 0 0 auto;
+  height: clamp(240px, 35vh, 338px);
+  min-height: 0;
+  max-height: clamp(240px, 35vh, 338px);
+  padding-right: 2px;
+  overscroll-behavior: contain;
+}
+
+#pinnedSubSection #pinnedMissions {
+  max-height: calc(2 * 94px + 10px);
+  padding-right: 2px;
+  overscroll-behavior: contain;
 }
 
 .smart-cleanup-card,
@@ -2427,9 +2668,35 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   margin-top: 0;
 }
 
+#smartCleanupCard {
+  flex: 0 0 auto;
+  overflow: auto;
+  align-self: stretch;
+}
+
 .profile-library {
-  flex: 1;
-  min-height: 240px;
+  flex: 0 1 var(--bookmarks-panel-height);
+  min-height: 0;
+  height: var(--bookmarks-panel-height);
+  max-height: var(--bookmarks-panel-height);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+#profileLibraryPanel {
+  flex: 0 1 var(--bookmarks-panel-height);
+  flex-shrink: 1;
+  min-height: 0;
+  height: var(--bookmarks-panel-height);
+  max-height: var(--bookmarks-panel-height);
+  align-self: stretch;
+  overflow: hidden;
+}
+
+#profileLibraryPanel .profile-library-section {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2488,10 +2755,13 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 
 #profileBookmarksList {
   flex: 1;
+  height: 100%;
   min-height: 0;
   max-height: none;
   overflow-y: auto;
   padding-right: 2px;
+  padding-bottom: 12px;
+  overscroll-behavior: contain;
 }
 
 .bookmark-tree-folder {
@@ -2628,12 +2898,16 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   }
 
   .hero-section {
-    min-height: 190px;
-    padding: clamp(16px, 3vw, 22px) clamp(16px, 3.2vw, 24px);
+    min-height: 128px;
+    padding: clamp(10px, 2.2vw, 14px) clamp(16px, 3.2vw, 24px);
   }
 
   .hero-section h1 {
     font-size: clamp(20px, 2.6vw, 30px);
+  }
+
+  .daily-planner {
+    grid-template-columns: minmax(220px, 0.92fr) minmax(240px, 1.08fr);
   }
 
   .todo-form {
@@ -2659,8 +2933,8 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
     grid-column: 1 / -1;
   }
 
-  .profile-library {
-    min-height: 220px;
+  .daily-planner {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2702,8 +2976,8 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   }
 
   .hero-section {
-    min-height: 170px;
-    padding: 16px 16px 18px;
+    min-height: 114px;
+    padding: 11px 16px 12px;
   }
 
   .hero-section h1 {
@@ -2711,11 +2985,20 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   }
 
   .todo-panel-expanded {
-    min-height: 240px;
+    min-height: 0;
   }
 
   .todo-form {
     grid-template-columns: minmax(0, 1fr) 70px 22px;
+  }
+
+  .todo-list-compact {
+    min-height: 185px;
+    max-height: 185px;
+  }
+
+  .calendar-day {
+    min-height: 40px;
   }
 
   .profile-library {
@@ -2723,7 +3006,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   }
 
   #profileBookmarksList {
-    max-height: 240px;
+    max-height: none;
   }
 
 }
@@ -2758,6 +3041,16 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
     gap: 6px;
   }
 
+  .daily-planner-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .planner-nav {
+    width: 100%;
+  }
+
+
   .profile-library-actions {
     width: 100%;
   }
@@ -2772,8 +3065,8 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 
 @media (max-width: 560px) {
   .hero-section {
-    min-height: 150px;
-    padding: 14px 14px 16px;
+    min-height: 100px;
+    padding: 10px 14px 11px;
   }
 
   .hero-section h1 {
@@ -2798,6 +3091,6 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   }
 
   #profileBookmarksList {
-    max-height: 200px;
+    max-height: none;
   }
 }

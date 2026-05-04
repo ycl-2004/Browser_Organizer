@@ -16,6 +16,7 @@
   const LOCAL_KEYS = {
     favorites: 'favorites',
     favoriteSections: 'favoriteSections',
+    dailyTasks: 'dailyTasks',
     lang: 'lang',
     theme: 'theme',
   };
@@ -23,6 +24,7 @@
   const META_KEYS = {
     favorites: '__tabHomeFavoritesUpdatedAt',
     favoriteSections: '__tabHomeFavoriteSectionsUpdatedAt',
+    dailyTasks: '__tabHomeDailyTasksUpdatedAt',
     lang: '__tabHomeLangUpdatedAt',
     theme: '__tabHomeThemeUpdatedAt',
   };
@@ -108,6 +110,36 @@
     return sections.map((section, index) => ({ ...section, order: index }));
   }
 
+  function normalizeDailyTask(value) {
+    if (!value || typeof value !== 'object') return null;
+
+    const title = typeof value.title === 'string' ? value.title.trim() : '';
+    const date = typeof value.date === 'string' ? value.date.trim() : '';
+
+    if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+
+    return {
+      id: typeof value.id === 'string' && value.id
+        ? value.id
+        : `task-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      title,
+      tag: typeof value.tag === 'string' && value.tag.trim() ? value.tag.trim() : 'Work',
+      date,
+      done: !!value.done,
+      createdAt: typeof value.createdAt === 'string' && value.createdAt
+        ? value.createdAt
+        : new Date().toISOString(),
+      updatedAt: typeof value.updatedAt === 'string' && value.updatedAt
+        ? value.updatedAt
+        : new Date().toISOString(),
+    };
+  }
+
+  function normalizeDailyTasks(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map(normalizeDailyTask).filter(Boolean);
+  }
+
   async function getFavorites() {
     const data = await chrome.storage.local.get(LOCAL_KEYS.favorites);
     return normalizeFavoriteArray(data[LOCAL_KEYS.favorites]);
@@ -116,6 +148,11 @@
   async function getFavoriteSections() {
     const data = await chrome.storage.local.get(LOCAL_KEYS.favoriteSections);
     return normalizeFavoriteSections(data[LOCAL_KEYS.favoriteSections]);
+  }
+
+  async function getDailyTasks() {
+    const data = await chrome.storage.local.get(LOCAL_KEYS.dailyTasks);
+    return normalizeDailyTasks(data[LOCAL_KEYS.dailyTasks]);
   }
 
   async function getLang() {
@@ -142,6 +179,15 @@
     const normalized = normalizeFavoriteSections(sections);
     const payload = { [LOCAL_KEYS.favoriteSections]: normalized };
     if (touch) payload[META_KEYS.favoriteSections] = Date.now();
+    await chrome.storage.local.set(payload);
+    return normalized;
+  }
+
+  async function setDailyTasks(tasks, options = {}) {
+    const touch = options.touch !== false;
+    const normalized = normalizeDailyTasks(tasks);
+    const payload = { [LOCAL_KEYS.dailyTasks]: normalized };
+    if (touch) payload[META_KEYS.dailyTasks] = Date.now();
     await chrome.storage.local.set(payload);
     return normalized;
   }
@@ -191,10 +237,12 @@
     LOCAL_KEYS,
     META_KEYS,
     cleanupLegacySyncData,
+    getDailyTasks,
     getFavorites,
     getFavoriteSections,
     getLang,
     getTheme,
+    setDailyTasks,
     setFavorites,
     setFavoriteSections,
     setLang,

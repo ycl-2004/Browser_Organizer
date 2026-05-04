@@ -114,21 +114,47 @@
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Next actions</p>
-            <h2>Today Task</h2>
+            <h2 id="todoPanelTitle">Today Task</h2>
           </div>
           <span class="todo-count" id="todoCount">0</span>
         </div>
-        <div class="todo-list" id="todoList"></div>
-        <form class="todo-form" id="todoForm">
-          <input id="todoInput" type="text" placeholder="Add a new task..." autocomplete="off">
-          <select id="todoTagInput" aria-label="Task tag">
-            <option value="Work">Work</option>
-            <option value="Projects">Projects</option>
-            <option value="Personal">Personal</option>
-            <option value="Design">Design</option>
-          </select>
-          <button type="submit" aria-label="Add task">+</button>
-        </form>
+        <div class="todo-list todo-list-compact" id="todoList"></div>
+
+        <section class="daily-planner" aria-label="Daily planner">
+          <div class="daily-planner-header">
+            <div>
+              <p class="eyebrow" id="plannerEyebrow">Daily planner</p>
+              <h3 id="plannerMonthLabel">May 2026</h3>
+            </div>
+            <div class="planner-nav">
+              <button type="button" data-action="planner-prev-month" aria-label="Previous month">‹</button>
+              <button type="button" data-action="planner-today">Today</button>
+              <button type="button" data-action="planner-next-month" aria-label="Next month">›</button>
+            </div>
+          </div>
+
+          <div class="calendar-grid" id="calendarGrid"></div>
+
+          <div class="selected-day-panel">
+            <div class="selected-day-header">
+              <span id="selectedDateLabel">Selected day</span>
+              <small id="selectedDateCount">0 tasks</small>
+            </div>
+
+            <div class="selected-day-tasks" id="selectedDayTasks"></div>
+
+            <form class="todo-form selected-day-form" id="selectedDayTodoForm">
+              <input id="selectedDayTodoInput" type="text" placeholder="Add task for selected day..." autocomplete="off">
+              <select id="selectedDayTodoTagInput" aria-label="Task tag">
+                <option value="Work">Work</option>
+                <option value="Projects">Projects</option>
+                <option value="Personal">Personal</option>
+                <option value="Design">Design</option>
+              </select>
+              <button type="submit" aria-label="Add task">+</button>
+            </form>
+          </div>
+        </section>
       </section>
     </section>
 

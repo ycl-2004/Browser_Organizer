@@ -21,6 +21,8 @@ const APP_DISPLAY_NAME = 'Browser Organizer';
 const EXPORT_APP_ID = 'browser-organizer';
 const LEGACY_EXPORT_APP_IDS = ['tab-home'];
 const PROFILE_BOOKMARK_PREVIEW_LIMIT = 5;
+const TODAY_TASK_PREVIEW_LIMIT = 4;
+const PLANNER_MAX_DAYS_AHEAD = 365;
 
 /* No hard cap on favorites. The favorites column scrolls when content
    overflows. SLOT_UPPER_BOUND is just a defensive ceiling on slot indices
@@ -81,13 +83,21 @@ const STRINGS = {
     todoEmpty: 'No tasks yet. Add one small next step.',
     todoAdded: 'Task added',
     todoDone: 'Task completed',
+    plannerEyebrow: 'Daily planner',
+    plannerToday: 'Today',
+    plannerSelectedDay: 'Selected day',
+    plannerDayTasks: (n) => `${n} task${n !== 1 ? 's' : ''}`,
+    plannerNoTasks: 'No tasks planned for this day.',
+    plannerAddForDay: 'Add task for selected day...',
+    plannerRangeError: 'You can only plan within the next 365 days.',
+    plannerMoreToday: (n) => `${n} more today`,
     profileUpdated: 'Profile image updated',
     exportData: 'Export',
     importData: 'Import',
     exportDone: 'Backup exported',
     importDone: 'Backup imported',
     importFailed: 'Import failed. Please choose a valid Browser Organizer JSON backup.',
-    confirmImport: 'Importing this backup will replace your saved favorites, sections, todos, hero note, profile image, and theme on this browser. Continue?',
+    confirmImport: 'Importing this backup will replace your saved favorites, sections, daily planner tasks, hero note, profile image, and theme on this browser. Continue?',
     heroTitleUpdated: 'Hero title updated',
     heroCopyUpdated: 'Hero note updated',
     heroCopyEditHint: 'Double-click to edit',
@@ -157,13 +167,21 @@ const STRINGS = {
     todoEmpty: '还没有任务。先写下一件小事。',
     todoAdded: '任务已添加',
     todoDone: '任务已完成',
+    plannerEyebrow: '每日规划',
+    plannerToday: '今天',
+    plannerSelectedDay: '已选日期',
+    plannerDayTasks: (n) => `${n} 个任务`,
+    plannerNoTasks: '这一天还没有安排任务。',
+    plannerAddForDay: '为选中日期添加任务...',
+    plannerRangeError: '只能计划从今天起 365 天内的任务。',
+    plannerMoreToday: (n) => `今天还有 ${n} 个`,
     profileUpdated: '头像已更新',
     exportData: '导出',
     importData: '导入',
     exportDone: '备份已导出',
     importDone: '备份已导入',
     importFailed: '导入失败。请选择有效的 Browser Organizer JSON 备份。',
-    confirmImport: '导入这个备份会替换此浏览器当前保存的收藏、分组、待办、Hero 文案、头像和主题。继续吗？',
+    confirmImport: '导入这个备份会替换此浏览器当前保存的收藏、分组、Daily Planner 任务、Hero 文案、头像和主题。继续吗？',
     heroTitleUpdated: 'Hero 标题已更新',
     heroCopyUpdated: 'Hero 文案已更新',
     heroCopyEditHint: '双击编辑',
@@ -193,6 +211,9 @@ const STRINGS = {
 let currentLang = 'en';
 let collapsedBookmarkFolders = new Set();
 let expandedBookmarkFolders = new Set();
+let dailyTasks = [];
+let selectedPlannerDate = toLocalDateKey(new Date());
+let visiblePlannerMonth = startOfMonth(new Date());
 
 function t(key, ...args) {
   const v = (STRINGS[currentLang] && STRINGS[currentLang][key]) ?? STRINGS.en[key] ?? key;
@@ -342,9 +363,10 @@ function applyStaticI18n() {
   const heroCopy = document.getElementById('heroCopy');
   if (heroCopy) heroCopy.setAttribute('title', t('heroCopyEditHint'));
   setText('.todo-panel .eyebrow', dashboardText.nextActions);
-  setText('.todo-panel h2', dashboardText.todoList);
-  const todoInput = document.getElementById('todoInput');
-  if (todoInput) todoInput.placeholder = t('todoPlaceholder');
+  setText('#todoPanelTitle', dashboardText.todoList);
+  setText('#plannerEyebrow', t('plannerEyebrow'));
+  const selectedDayTodoInput = document.getElementById('selectedDayTodoInput');
+  if (selectedDayTodoInput) selectedDayTodoInput.placeholder = t('plannerAddForDay');
   setText('.tabs-column > .panel-heading .eyebrow', dashboardText.nowOpen);
   setText('#openTabsSubSection .compact-section-header h2', dashboardText.byDomain);
   setText('.smart-cleanup-card .eyebrow', dashboardText.smartCleanup);
@@ -866,37 +888,345 @@ async function isFavorited(url) {
 }
 
 /* ----------------------------------------------------------------
-   TODOS + PROFILE — local-only Phase 3 data
+   DAILY PLANNER + PROFILE — local-only planning data
    ---------------------------------------------------------------- */
 
-async function getTodos() {
+function toLocalDateKey(date) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDateKey(key) {
+  const match = /^\d{4}-\d{2}-\d{2}$/.exec(String(key || ''));
+  if (!match) return new Date();
+  const [year, month, day] = String(key).split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function startOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function addMonths(date, months) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+function getPlannerMaxDateKey() {
+  return toLocalDateKey(addDays(new Date(), PLANNER_MAX_DAYS_AHEAD));
+}
+
+function isDateInPlannerRange(dateKey) {
+  const todayKey = toLocalDateKey(new Date());
+  const maxKey = getPlannerMaxDateKey();
+  return dateKey >= todayKey && dateKey <= maxKey;
+}
+
+function compareIsoDesc(a, b) {
+  return String(b || '').localeCompare(String(a || ''));
+}
+
+function compareDailyTasks(a, b) {
+  if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+  if (String(a.date || '') !== String(b.date || '')) {
+    return String(a.date || '').localeCompare(String(b.date || ''));
+  }
+  const updatedCompare = compareIsoDesc(a.updatedAt, b.updatedAt);
+  if (updatedCompare !== 0) return updatedCompare;
+  return compareIsoDesc(a.createdAt, b.createdAt);
+}
+
+function sortDailyTasks(tasks) {
+  return [...tasks].sort(compareDailyTasks);
+}
+
+async function getLegacyTodos() {
   const { todos = [] } = await chrome.storage.local.get('todos');
   return Array.isArray(todos)
-    ? todos.filter(todo => todo && typeof todo.id === 'string' && typeof todo.text === 'string')
+    ? todos.filter(todo => todo && typeof todo === 'object' && typeof todo.text === 'string' && todo.text.trim())
     : [];
 }
 
-async function setTodos(todos) {
-  await chrome.storage.local.set({ todos });
+function mapLegacyTodoToDailyTask(todo, dateKey) {
+  const createdAt = typeof todo.createdAt === 'number' && todo.createdAt > 0
+    ? new Date(todo.createdAt).toISOString()
+    : new Date().toISOString();
+
+  return {
+    id: typeof todo.id === 'string' && todo.id ? todo.id : makeId('task'),
+    title: todo.text.trim(),
+    tag: typeof todo.tag === 'string' && todo.tag.trim() ? todo.tag.trim() : 'Work',
+    date: dateKey,
+    done: false,
+    createdAt,
+    updatedAt: createdAt,
+  };
 }
 
-async function addTodo(text, tag = 'Work') {
-  const cleanText = (text || '').trim();
-  if (!cleanText) return false;
-  const todos = await getTodos();
-  todos.push({
-    id: makeId('todo'),
-    text: cleanText,
-    tag: tag || 'Work',
-    createdAt: Date.now(),
-  });
-  await setTodos(todos);
+async function migrateLegacyTodosToDailyTasks() {
+  if (dailyTasks.length > 0) return false;
+
+  const legacyTodos = await getLegacyTodos();
+  if (!legacyTodos.length) return false;
+
+  const todayKey = toLocalDateKey(new Date());
+  dailyTasks = await TabHomeStorage.setDailyTasks(
+    legacyTodos.map(todo => mapLegacyTodoToDailyTask(todo, todayKey))
+  );
+
+  try {
+    await chrome.storage.local.remove('todos');
+  } catch {}
+
   return true;
 }
 
-async function completeTodo(id) {
-  const todos = await getTodos();
-  await setTodos(todos.filter(todo => todo.id !== id));
+function ensurePlannerSelection() {
+  const today = new Date();
+  const minMonth = startOfMonth(today);
+  const maxMonth = startOfMonth(parseLocalDateKey(getPlannerMaxDateKey()));
+
+  if (!isDateInPlannerRange(selectedPlannerDate)) {
+    selectedPlannerDate = toLocalDateKey(today);
+  }
+
+  if (!(visiblePlannerMonth instanceof Date) || Number.isNaN(visiblePlannerMonth.getTime())) {
+    visiblePlannerMonth = startOfMonth(parseLocalDateKey(selectedPlannerDate));
+  }
+
+  if (visiblePlannerMonth.getTime() < minMonth.getTime()) {
+    visiblePlannerMonth = minMonth;
+  }
+  if (visiblePlannerMonth.getTime() > maxMonth.getTime()) {
+    visiblePlannerMonth = maxMonth;
+  }
+}
+
+async function pruneExpiredDailyTasks() {
+  const todayKey = toLocalDateKey(new Date());
+  const maxKey = getPlannerMaxDateKey();
+  const filtered = sortDailyTasks(
+    dailyTasks.filter(task => task.date >= todayKey && task.date <= maxKey)
+  );
+  const changed = filtered.length !== dailyTasks.length;
+  dailyTasks = filtered;
+  if (changed) {
+    dailyTasks = await TabHomeStorage.setDailyTasks(dailyTasks);
+  }
+}
+
+async function loadDailyTasks() {
+  dailyTasks = await TabHomeStorage.getDailyTasks();
+  await migrateLegacyTodosToDailyTasks();
+  await pruneExpiredDailyTasks();
+  dailyTasks = sortDailyTasks(dailyTasks);
+  ensurePlannerSelection();
+}
+
+async function persistDailyTasks() {
+  dailyTasks = sortDailyTasks(dailyTasks);
+  dailyTasks = await TabHomeStorage.setDailyTasks(dailyTasks);
+}
+
+function getTasksForDate(dateKey) {
+  return sortDailyTasks(dailyTasks.filter(task => task.date === dateKey));
+}
+
+function getTodayTasks() {
+  return getTasksForDate(toLocalDateKey(new Date()));
+}
+
+function renderDailyTaskRow(task) {
+  const id = escapeHtml(task.id);
+  const title = escapeHtml(task.title);
+  const tag = escapeHtml(task.tag || 'Work');
+  const checked = task.done ? 'checked' : '';
+  const doneClass = task.done ? ' is-done' : '';
+
+  return `
+    <div class="todo-item daily-task-row${doneClass}" data-task-id="${id}">
+      <label class="todo-check-wrap" aria-label="${task.done ? 'Done' : 'Pending'}">
+        <input type="checkbox" data-action="toggle-daily-task" data-task-id="${id}" ${checked}>
+      </label>
+      <span class="todo-title">${title}</span>
+      <span class="todo-tag">${tag}</span>
+      <button class="todo-delete" type="button" data-action="delete-daily-task" data-task-id="${id}" aria-label="Delete task">×</button>
+    </div>
+  `;
+}
+
+function renderTodayTasks() {
+  const list = document.getElementById('todoList');
+  const count = document.getElementById('todoCount');
+  if (!list || !count) return;
+
+  const todayTasks = getTodayTasks();
+
+  count.textContent = String(todayTasks.length);
+
+  if (!todayTasks.length) {
+    list.innerHTML = `<div class="todo-empty">${t('todoEmpty')}</div>`;
+    return;
+  }
+
+  list.innerHTML = todayTasks.map(renderDailyTaskRow).join('');
+}
+
+function renderCalendarGrid() {
+  const grid = document.getElementById('calendarGrid');
+  const label = document.getElementById('plannerMonthLabel');
+  const prevBtn = document.querySelector('[data-action="planner-prev-month"]');
+  const nextBtn = document.querySelector('[data-action="planner-next-month"]');
+  const todayBtn = document.querySelector('[data-action="planner-today"]');
+  if (!grid || !label) return;
+
+  ensurePlannerSelection();
+
+  const locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+  const month = visiblePlannerMonth;
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const todayKey = toLocalDateKey(new Date());
+
+  label.textContent = month.toLocaleDateString(locale, {
+    month: 'long',
+    year: 'numeric',
+  });
+  if (todayBtn) todayBtn.textContent = t('plannerToday');
+
+  const minMonth = startOfMonth(new Date());
+  const maxMonth = startOfMonth(parseLocalDateKey(getPlannerMaxDateKey()));
+  if (prevBtn) prevBtn.disabled = month.getTime() <= minMonth.getTime();
+  if (nextBtn) nextBtn.disabled = month.getTime() >= maxMonth.getTime();
+
+  const weekdayLabels = currentLang === 'zh'
+    ? ['一', '二', '三', '四', '五', '六', '日']
+    : ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  const taskCountByDate = new Map();
+  dailyTasks.forEach((task) => {
+    taskCountByDate.set(task.date, (taskCountByDate.get(task.date) || 0) + 1);
+  });
+
+  const firstDay = new Date(year, monthIndex, 1);
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cells = weekdayLabels.map(day => `<div class="calendar-weekday">${day}</div>`);
+
+  for (let i = 0; i < startOffset; i += 1) {
+    cells.push('<div class="calendar-day is-empty"></div>');
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(year, monthIndex, day);
+    const dateKey = toLocalDateKey(date);
+    const selected = dateKey === selectedPlannerDate ? ' is-selected' : '';
+    const today = dateKey === todayKey ? ' is-today' : '';
+    const disabled = !isDateInPlannerRange(dateKey) ? 'disabled' : '';
+    const taskCount = taskCountByDate.get(dateKey) || 0;
+
+    cells.push(`
+      <button
+        class="calendar-day${selected}${today}"
+        type="button"
+        data-action="select-planner-date"
+        data-date="${dateKey}"
+        ${disabled}
+      >
+        <span>${day}</span>
+        ${taskCount ? `<small>${taskCount}</small>` : ''}
+      </button>
+    `);
+  }
+
+  grid.innerHTML = cells.join('');
+}
+
+function renderSelectedDayPanel() {
+  const label = document.getElementById('selectedDateLabel');
+  const count = document.getElementById('selectedDateCount');
+  const list = document.getElementById('selectedDayTasks');
+  if (!label || !count || !list) return;
+
+  ensurePlannerSelection();
+
+  const locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+  const selectedDate = parseLocalDateKey(selectedPlannerDate);
+  const tasks = getTasksForDate(selectedPlannerDate);
+
+  label.textContent = selectedDate.toLocaleDateString(locale, {
+    weekday: currentLang === 'zh' ? 'short' : 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  count.textContent = t('plannerDayTasks', tasks.length);
+
+  if (!tasks.length) {
+    list.innerHTML = `<div class="selected-day-empty">${t('plannerNoTasks')}</div>`;
+    return;
+  }
+
+  list.innerHTML = tasks.map(renderDailyTaskRow).join('');
+}
+
+function renderDailyPlanner() {
+  ensurePlannerSelection();
+  renderTodayTasks();
+  renderCalendarGrid();
+  renderSelectedDayPanel();
+}
+
+async function addDailyTask(title, tag, dateKey) {
+  const cleanTitle = String(title || '').trim();
+  if (!cleanTitle) return false;
+  if (!isDateInPlannerRange(dateKey)) {
+    showToast(t('plannerRangeError'));
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  dailyTasks.push({
+    id: makeId('task'),
+    title: cleanTitle,
+    tag: tag || 'Work',
+    date: dateKey,
+    done: false,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await persistDailyTasks();
+  renderDailyPlanner();
+  return true;
+}
+
+async function toggleDailyTask(id) {
+  const task = dailyTasks.find(item => item.id === id);
+  if (!task) return false;
+
+  task.done = !task.done;
+  task.updatedAt = new Date().toISOString();
+  await persistDailyTasks();
+  renderDailyPlanner();
+  return task.done;
+}
+
+async function deleteDailyTask(id) {
+  const next = dailyTasks.filter(task => task.id !== id);
+  if (next.length === dailyTasks.length) return false;
+  dailyTasks = next;
+  await persistDailyTasks();
+  renderDailyPlanner();
+  return true;
 }
 
 async function getProfileImageDataUrl() {
@@ -1055,7 +1385,7 @@ function cancelHeroTitleEdit(el) {
    JSON BACKUP / RESTORE — local data portability without accounts
    ---------------------------------------------------------------- */
 
-const EXPORT_SCHEMA_VERSION = 1;
+const EXPORT_SCHEMA_VERSION = 2;
 
 function isImageDataUrl(value) {
   return typeof value === 'string' && value.startsWith('data:image/');
@@ -1082,20 +1412,23 @@ function sanitizeFavoriteForExport(favorite) {
   return exported;
 }
 
-function sanitizeTodoForExport(todo) {
+function sanitizeDailyTaskForExport(task) {
   return {
-    id: todo.id,
-    text: todo.text,
-    tag: todo.tag || 'Work',
-    createdAt: typeof todo.createdAt === 'number' ? todo.createdAt : Date.now(),
+    id: task.id,
+    title: task.title,
+    tag: task.tag || 'Work',
+    date: task.date,
+    done: !!task.done,
+    createdAt: typeof task.createdAt === 'string' && task.createdAt ? task.createdAt : new Date().toISOString(),
+    updatedAt: typeof task.updatedAt === 'string' && task.updatedAt ? task.updatedAt : new Date().toISOString(),
   };
 }
 
 async function buildExportPayload() {
-  const [favorites, favoriteSections, todos, profileImageDataUrl, heroTitle, heroCopy] = await Promise.all([
+  const [favorites, favoriteSections, storedDailyTasks, profileImageDataUrl, heroTitle, heroCopy] = await Promise.all([
     getFavorites(),
     getFavoriteSections(),
-    getTodos(),
+    TabHomeStorage.getDailyTasks(),
     getProfileImageDataUrl(),
     getStoredHeroTitle(),
     getStoredHeroCopy(),
@@ -1110,7 +1443,7 @@ async function buildExportPayload() {
     data: {
       favoriteSections,
       favorites: favorites.map(sanitizeFavoriteForExport),
-      todos: todos.map(sanitizeTodoForExport),
+      dailyTasks: storedDailyTasks.map(sanitizeDailyTaskForExport),
       heroTitle,
       heroCopy,
       profileImageDataUrl: isImageDataUrl(profileImageDataUrl) ? profileImageDataUrl : '',
@@ -1159,7 +1492,12 @@ function extractImportData(payload) {
   ) {
     return payload.data;
   }
-  if (Array.isArray(payload.favorites) || Array.isArray(payload.favoriteSections) || Array.isArray(payload.todos)) {
+  if (
+    Array.isArray(payload.favorites) ||
+    Array.isArray(payload.favoriteSections) ||
+    Array.isArray(payload.dailyTasks) ||
+    Array.isArray(payload.todos)
+  ) {
     return payload;
   }
   return null;
@@ -1222,17 +1560,35 @@ function normalizeImportedFavorites(value, sections) {
     });
 }
 
-function normalizeImportedTodos(value) {
+function normalizeImportedDailyTasks(value) {
   if (!Array.isArray(value)) return [];
 
   return value
-    .filter(todo => todo && typeof todo === 'object' && typeof todo.text === 'string' && todo.text.trim())
-    .map(todo => ({
-      id: typeof todo.id === 'string' && todo.id ? todo.id : makeId('todo'),
-      text: todo.text.trim(),
-      tag: typeof todo.tag === 'string' && todo.tag.trim() ? todo.tag.trim() : 'Work',
-      createdAt: typeof todo.createdAt === 'number' && todo.createdAt > 0 ? todo.createdAt : Date.now(),
+    .filter(task => (
+      task &&
+      typeof task === 'object' &&
+      typeof task.title === 'string' &&
+      task.title.trim() &&
+      typeof task.date === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(task.date)
+    ))
+    .map(task => ({
+      id: typeof task.id === 'string' && task.id ? task.id : makeId('task'),
+      title: task.title.trim(),
+      tag: typeof task.tag === 'string' && task.tag.trim() ? task.tag.trim() : 'Work',
+      date: task.date,
+      done: !!task.done,
+      createdAt: typeof task.createdAt === 'string' && task.createdAt ? task.createdAt : new Date().toISOString(),
+      updatedAt: typeof task.updatedAt === 'string' && task.updatedAt ? task.updatedAt : new Date().toISOString(),
     }));
+}
+
+function normalizeImportedLegacyTodos(value) {
+  if (!Array.isArray(value)) return [];
+  const todayKey = toLocalDateKey(new Date());
+  return value
+    .filter(todo => todo && typeof todo === 'object' && typeof todo.text === 'string' && todo.text.trim())
+    .map(todo => mapLegacyTodoToDailyTask(todo, todayKey));
 }
 
 async function importTabHomeDataFromFile(file) {
@@ -1250,7 +1606,10 @@ async function importTabHomeDataFromFile(file) {
 
     const sections = normalizeImportedSections(data.favoriteSections);
     const favorites = normalizeImportedFavorites(data.favorites, sections);
-    const todos = normalizeImportedTodos(data.todos);
+    const normalizedDailyTasks = normalizeImportedDailyTasks(data.dailyTasks);
+    const importedDailyTasks = normalizedDailyTasks.length
+      ? normalizedDailyTasks
+      : normalizeImportedLegacyTodos(data.todos);
     const heroTitle = typeof data.heroTitle === 'string' ? data.heroTitle : '';
     const heroCopy = typeof data.heroCopy === 'string' ? data.heroCopy : '';
     const profileImageDataUrl = isImageDataUrl(data.profileImageDataUrl) ? data.profileImageDataUrl : '';
@@ -1260,7 +1619,9 @@ async function importTabHomeDataFromFile(file) {
     try {
       await setFavoriteSections(sections);
       await setFavorites(favorites);
-      await setTodos(todos);
+      dailyTasks = sortDailyTasks(importedDailyTasks);
+      await TabHomeStorage.setDailyTasks(dailyTasks);
+      try { await chrome.storage.local.remove('todos'); } catch {}
       await setHeroTitle(heroTitle);
       await setHeroCopy(heroCopy);
       await setProfileImageDataUrl(profileImageDataUrl);
@@ -1271,6 +1632,7 @@ async function importTabHomeDataFromFile(file) {
 
     await loadTheme();
     await migrateFavoritesToSections();
+    await pruneExpiredDailyTasks();
     await populateFavoriteSectionInput();
     await paintHeroTitle();
     await paintHeroCopy();
@@ -2181,31 +2543,6 @@ function renderFavoriteItem(fav) {
     </a>`;
 }
 
-async function renderTodos() {
-  const list = document.getElementById('todoList');
-  const count = document.getElementById('todoCount');
-  if (!list) return;
-  const todos = (await getTodos()).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  if (count) count.textContent = String(todos.length);
-
-  if (todos.length === 0) {
-    list.innerHTML = `<div class="todo-empty">${t('todoEmpty')}</div>`;
-    return;
-  }
-
-  list.innerHTML = todos.map(todo => {
-    const safeText = escapeHtml(todo.text);
-    const safeTag = escapeHtml(todo.tag || 'Work');
-    return `
-      <div class="todo-item" data-todo-id="${todo.id}">
-        <button class="todo-check" data-action="complete-todo" data-todo-id="${todo.id}" aria-label="Complete task"></button>
-        <span class="todo-text">${safeText}</span>
-        <span class="todo-tag">${safeTag}</span>
-        <button class="todo-remove" data-action="complete-todo" data-todo-id="${todo.id}" aria-label="Remove task">×</button>
-      </div>`;
-  }).join('');
-}
-
 /* ----------------------------------------------------------------
    CHROME PROFILE BOOKMARKS + READING LIST
 
@@ -2554,7 +2891,7 @@ async function renderStaticDashboard() {
   pinnedDomainGroups = groupTabsByDomain(pinnedRealTabs);
   domainGroups       = groupTabsByDomain(regularRealTabs);
   renderSmartCleanup(realTabs);
-  await renderTodos();
+  renderDailyPlanner();
 
   // --- Render domain cards ---
   const openTabsSection       = document.getElementById('openTabsSection');
@@ -2662,6 +2999,58 @@ document.addEventListener('click', async (e) => {
   // ---- Theme toggle (light / dark) ----
   if (action === 'toggle-theme') {
     await toggleTheme();
+    return;
+  }
+
+  if (action === 'select-planner-date') {
+    const dateKey = actionEl.dataset.date;
+    if (!dateKey || !isDateInPlannerRange(dateKey)) return;
+    selectedPlannerDate = dateKey;
+    visiblePlannerMonth = startOfMonth(parseLocalDateKey(dateKey));
+    renderDailyPlanner();
+    return;
+  }
+
+  if (action === 'planner-prev-month') {
+    const nextMonth = addMonths(visiblePlannerMonth, -1);
+    const minMonth = startOfMonth(new Date());
+    if (nextMonth.getTime() >= minMonth.getTime()) {
+      visiblePlannerMonth = nextMonth;
+      renderDailyPlanner();
+    }
+    return;
+  }
+
+  if (action === 'planner-next-month') {
+    const nextMonth = addMonths(visiblePlannerMonth, 1);
+    const maxMonth = startOfMonth(parseLocalDateKey(getPlannerMaxDateKey()));
+    if (nextMonth.getTime() <= maxMonth.getTime()) {
+      visiblePlannerMonth = nextMonth;
+      renderDailyPlanner();
+    }
+    return;
+  }
+
+  if (action === 'planner-today' || action === 'planner-select-today') {
+    const today = new Date();
+    selectedPlannerDate = toLocalDateKey(today);
+    visiblePlannerMonth = startOfMonth(today);
+    renderDailyPlanner();
+    return;
+  }
+
+  if (action === 'toggle-daily-task') {
+    const id = actionEl.dataset.taskId;
+    if (!id) return;
+    const completed = await toggleDailyTask(id);
+    if (completed) showToast(t('todoDone'));
+    return;
+  }
+
+  if (action === 'delete-daily-task') {
+    const id = actionEl.dataset.taskId;
+    if (!id) return;
+    await deleteDailyTask(id);
     return;
   }
 
@@ -2935,15 +3324,6 @@ document.addEventListener('click', async (e) => {
     } else {
       showToast(t('noDupes'));
     }
-    return;
-  }
-
-  if (action === 'complete-todo') {
-    const id = actionEl.dataset.todoId;
-    if (!id) return;
-    await completeTodo(id);
-    await renderTodos();
-    showToast(t('todoDone'));
     return;
   }
 
@@ -3504,14 +3884,14 @@ document.addEventListener('submit', (e) => {
 });
 
 document.addEventListener('submit', async (e) => {
-  if (e.target.id !== 'todoForm') return;
+  if (e.target.id !== 'selectedDayTodoForm') return;
   e.preventDefault();
-  const input = document.getElementById('todoInput');
-  const tagInput = document.getElementById('todoTagInput');
-  const ok = await addTodo(input && input.value, tagInput && tagInput.value);
+  const input = document.getElementById('selectedDayTodoInput');
+  const tagInput = document.getElementById('selectedDayTodoTagInput');
+  const ok = await addDailyTask(input && input.value, tagInput && tagInput.value, selectedPlannerDate);
   if (!ok) return;
   input.value = '';
-  await renderTodos();
+  input.focus();
   showToast(t('todoAdded'));
 });
 
@@ -3720,7 +4100,11 @@ if (chrome.storage && chrome.storage.onChanged) {
         renderFavoritesColumn();
         populateFavoriteSectionInput();
       }
-      if (changes.todos) renderTodos();
+      if (changes.dailyTasks) {
+        dailyTasks = sortDailyTasks(await TabHomeStorage.getDailyTasks());
+        await pruneExpiredDailyTasks();
+        renderDailyPlanner();
+      }
       if (changes.heroTitle) {
         const heroTitle = document.getElementById('heroTitle');
         if (!heroTitle || !heroTitle.isContentEditable) paintHeroTitle();
@@ -3757,6 +4141,7 @@ if (chrome.bookmarks) {
   await loadTheme();
   await migrateAwayFromFolders();
   await migrateFavoritesToSections();
+  await loadDailyTasks();
   applyStaticI18n();
   await paintHeroTitle();
   await paintHeroCopy();
