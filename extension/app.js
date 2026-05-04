@@ -21,7 +21,6 @@ const APP_DISPLAY_NAME = 'Browser Organizer';
 const EXPORT_APP_ID = 'browser-organizer';
 const LEGACY_EXPORT_APP_IDS = ['tab-home'];
 const PROFILE_BOOKMARK_PREVIEW_LIMIT = 5;
-const TODAY_TASK_PREVIEW_LIMIT = 4;
 const PLANNER_MAX_DAYS_AHEAD = 365;
 
 /* No hard cap on favorites. The favorites column scrolls when content
@@ -90,7 +89,6 @@ const STRINGS = {
     plannerNoTasks: 'No tasks planned for this day.',
     plannerAddForDay: 'Add task for selected day...',
     plannerRangeError: 'You can only plan within the next 365 days.',
-    plannerMoreToday: (n) => `${n} more today`,
     profileUpdated: 'Profile image updated',
     exportData: 'Export',
     importData: 'Import',
@@ -174,7 +172,6 @@ const STRINGS = {
     plannerNoTasks: '这一天还没有安排任务。',
     plannerAddForDay: '为选中日期添加任务...',
     plannerRangeError: '只能计划从今天起 365 天内的任务。',
-    plannerMoreToday: (n) => `今天还有 ${n} 个`,
     profileUpdated: '头像已更新',
     exportData: '导出',
     importData: '导入',
