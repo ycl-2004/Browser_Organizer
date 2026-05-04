@@ -110,11 +110,11 @@
         <div class="hero-orb" aria-hidden="true"></div>
       </section>
 
-      <section class="todo-panel dashboard-panel">
+      <section class="todo-panel dashboard-panel todo-panel-expanded">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Next actions</p>
-            <h2>To-do List</h2>
+            <h2>Today Task</h2>
           </div>
           <span class="todo-count" id="todoCount">0</span>
         </div>
@@ -129,16 +129,6 @@
           </select>
           <button type="submit" aria-label="Add task">+</button>
         </form>
-      </section>
-
-      <section class="workspaces-panel dashboard-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">Live context</p>
-            <h2>Workspaces</h2>
-          </div>
-        </div>
-        <div class="workspaces-list" id="workspacesList"></div>
       </section>
     </section>
 
@@ -187,7 +177,11 @@
             <p class="eyebrow" id="profileLibraryEyebrow">Chrome profile</p>
             <h2 id="profileLibraryTitle">Bookmarks & Lists</h2>
           </div>
-          <button class="profile-library-manager" type="button" data-action="open-bookmark-manager" id="profileLibraryManager">All</button>
+          <div class="profile-library-actions">
+            <button class="profile-library-manager" type="button" data-action="collapse-bookmarks" id="profileLibraryCollapse">Collapse all</button>
+            <button class="profile-library-manager" type="button" data-action="expand-bookmarks" id="profileLibraryExpand">Expand all</button>
+            <button class="profile-library-more" type="button" data-action="open-bookmark-manager" id="profileLibraryManager" title="Open Chrome Bookmark Manager">⋮</button>
+          </div>
         </div>
 
         <div class="profile-library-section">
@@ -196,14 +190,6 @@
             <small id="profileBookmarksCount">0</small>
           </div>
           <div class="profile-link-list" id="profileBookmarksList"></div>
-        </div>
-
-        <div class="profile-library-section">
-          <div class="profile-library-subhead">
-            <span id="profileReadingListTitle">Reading List</span>
-            <small id="profileReadingListCount">0</small>
-          </div>
-          <div class="profile-link-list" id="profileReadingList"></div>
         </div>
       </section>
     </aside>

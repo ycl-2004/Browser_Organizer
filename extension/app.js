@@ -20,8 +20,7 @@ const TabHomeStorage = window.TabHomeStorage;
 const APP_DISPLAY_NAME = 'Browser Organizer';
 const EXPORT_APP_ID = 'browser-organizer';
 const LEGACY_EXPORT_APP_IDS = ['tab-home'];
-const PROFILE_BOOKMARK_ROW_LIMIT = 30;
-const PROFILE_READING_ROW_LIMIT = 8;
+const PROFILE_BOOKMARK_PREVIEW_LIMIT = 5;
 
 /* No hard cap on favorites. The favorites column scrolls when content
    overflows. SLOT_UPPER_BOUND is just a defensive ceiling on slot indices
@@ -89,6 +88,7 @@ const STRINGS = {
     importDone: 'Backup imported',
     importFailed: 'Import failed. Please choose a valid Browser Organizer JSON backup.',
     confirmImport: 'Importing this backup will replace your saved favorites, sections, todos, hero note, profile image, and theme on this browser. Continue?',
+    heroTitleUpdated: 'Hero title updated',
     heroCopyUpdated: 'Hero note updated',
     heroCopyEditHint: 'Double-click to edit',
     newTab: 'New Tab',
@@ -96,12 +96,15 @@ const STRINGS = {
     profileLibraryTitle: 'Bookmarks & Lists',
     profileBookmarks: 'Bookmarks',
     profileReadingList: 'Reading List',
-    profileLibraryManager: 'All',
+    profileCollapseAll: 'Collapse all',
+    profileExpandAll: 'Expand all',
+    profileLibraryManagerTitle: 'Open Chrome Bookmark Manager',
     profileBookmarksEmpty: 'No Chrome profile bookmarks found.',
     profileReadingEmpty: 'No Reading List items.',
     profileBookmarksUnavailable: 'Allow the bookmarks permission, then reload.',
     profileReadingUnavailable: 'Reading List is not available in this Chrome version.',
     profileMoreItems: (n) => `${n} more in Chrome`,
+    profileViewAll: (n) => `View all ${n}`,
     profileRead: 'Read',
     profileUnread: 'Unread',
     bookmarkManagerUnavailable: 'Open chrome://bookmarks from the address bar.',
@@ -161,6 +164,7 @@ const STRINGS = {
     importDone: '备份已导入',
     importFailed: '导入失败。请选择有效的 Browser Organizer JSON 备份。',
     confirmImport: '导入这个备份会替换此浏览器当前保存的收藏、分组、待办、Hero 文案、头像和主题。继续吗？',
+    heroTitleUpdated: 'Hero 标题已更新',
     heroCopyUpdated: 'Hero 文案已更新',
     heroCopyEditHint: '双击编辑',
     newTab: '新标签',
@@ -168,12 +172,15 @@ const STRINGS = {
     profileLibraryTitle: '书签与列表',
     profileBookmarks: '书签',
     profileReadingList: '阅读清单',
-    profileLibraryManager: '全部',
+    profileCollapseAll: '全部收起',
+    profileExpandAll: '全部展开',
+    profileLibraryManagerTitle: '打开 Chrome 书签管理器',
     profileBookmarksEmpty: '没有找到这个 Chrome profile 的书签。',
     profileReadingEmpty: '阅读清单为空。',
     profileBookmarksUnavailable: '允许 bookmarks 权限后重新加载。',
     profileReadingUnavailable: '这个 Chrome 版本没有开放 Reading List。',
     profileMoreItems: (n) => `Chrome 里还有 ${n} 项`,
+    profileViewAll: (n) => `查看全部 ${n} 项`,
     profileRead: '已读',
     profileUnread: '未读',
     bookmarkManagerUnavailable: '请从地址栏打开 chrome://bookmarks。',
@@ -184,6 +191,8 @@ const STRINGS = {
 };
 
 let currentLang = 'en';
+let collapsedBookmarkFolders = new Set();
+let expandedBookmarkFolders = new Set();
 
 function t(key, ...args) {
   const v = (STRINGS[currentLang] && STRINGS[currentLang][key]) ?? STRINGS.en[key] ?? key;
@@ -270,9 +279,7 @@ function applyStaticI18n() {
     heroTitle: '保持专注，把更好的东西做出来。',
     heroCopy: '一个安静的控制台，放下你需要的标签、信任的链接，以及下一件值得做的事。',
     nextActions: '下一步',
-    todoList: '待办清单',
-    liveContext: '实时上下文',
-    workspaces: '工作区',
+    todoList: 'Today Task',
     nowOpen: '正在打开',
     byDomain: '按域名',
     smartCleanup: '智能清理',
@@ -283,9 +290,7 @@ function applyStaticI18n() {
     heroTitle: 'Stay focused, ship better things.',
     heroCopy: 'A calm command center for the tabs you need, the links you trust, and the next thing worth doing.',
     nextActions: 'Next actions',
-    todoList: 'To-do List',
-    liveContext: 'Live context',
-    workspaces: 'Workspaces',
+    todoList: 'Today Task',
     nowOpen: 'Now open',
     byDomain: 'By domain',
     smartCleanup: 'Smart cleanup',
@@ -332,15 +337,14 @@ function applyStaticI18n() {
   setText('.favorites-column .eyebrow', dashboardText.pinnedPlaces);
   setText('.favorite-section-header span', t('favorites'));
   setText('.favorite-section-header small', dashboardText.localFirst);
-  setText('#heroTitle', dashboardText.heroTitle);
+  const heroTitle = document.getElementById('heroTitle');
+  if (heroTitle) heroTitle.setAttribute('title', t('heroCopyEditHint'));
   const heroCopy = document.getElementById('heroCopy');
   if (heroCopy) heroCopy.setAttribute('title', t('heroCopyEditHint'));
   setText('.todo-panel .eyebrow', dashboardText.nextActions);
   setText('.todo-panel h2', dashboardText.todoList);
   const todoInput = document.getElementById('todoInput');
   if (todoInput) todoInput.placeholder = t('todoPlaceholder');
-  setText('.workspaces-panel .eyebrow', dashboardText.liveContext);
-  setText('.workspaces-panel h2', dashboardText.workspaces);
   setText('.tabs-column > .panel-heading .eyebrow', dashboardText.nowOpen);
   setText('#openTabsSubSection .compact-section-header h2', dashboardText.byDomain);
   setText('.smart-cleanup-card .eyebrow', dashboardText.smartCleanup);
@@ -348,8 +352,10 @@ function applyStaticI18n() {
   setText('#profileLibraryEyebrow', t('profileLibraryEyebrow'));
   setText('#profileLibraryTitle', t('profileLibraryTitle'));
   setText('#profileBookmarksTitle', t('profileBookmarks'));
-  setText('#profileReadingListTitle', t('profileReadingList'));
-  setText('#profileLibraryManager', t('profileLibraryManager'));
+  setText('#profileLibraryCollapse', t('profileCollapseAll'));
+  setText('#profileLibraryExpand', t('profileExpandAll'));
+  const profileLibraryManager = document.getElementById('profileLibraryManager');
+  if (profileLibraryManager) profileLibraryManager.title = t('profileLibraryManagerTitle');
 
   // Footer stat
   set('.stat-label', 'statTabs');
@@ -922,7 +928,34 @@ async function paintProfileImage() {
    HERO NOTE — editable local copy
    ---------------------------------------------------------------- */
 
+const HERO_TITLE_KEY = 'heroTitle';
 const HERO_COPY_KEY = 'heroCopy';
+
+function getDefaultHeroTitle() {
+  return currentLang === 'zh'
+    ? '保持专注，把更好的东西做出来。'
+    : 'Stay focused, ship better things.';
+}
+
+async function getStoredHeroTitle() {
+  const data = await chrome.storage.local.get(HERO_TITLE_KEY);
+  return typeof data[HERO_TITLE_KEY] === 'string' ? data[HERO_TITLE_KEY] : '';
+}
+
+async function setHeroTitle(value) {
+  const clean = String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+  await chrome.storage.local.set({ [HERO_TITLE_KEY]: clean });
+  return clean;
+}
+
+async function paintHeroTitle() {
+  const el = document.getElementById('heroTitle');
+  if (!el) return;
+  const stored = (await getStoredHeroTitle()).trim();
+  el.textContent = stored || getDefaultHeroTitle();
+  el.dataset.customHeroTitle = stored ? 'true' : 'false';
+  el.setAttribute('title', t('heroCopyEditHint'));
+}
 
 function getDefaultHeroCopy() {
   return currentLang === 'zh'
@@ -941,7 +974,7 @@ async function getHeroCopy() {
 }
 
 async function setHeroCopy(value) {
-  const clean = String(value || '').replace(/\u00a0/g, ' ').trim();
+  const clean = String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   await chrome.storage.local.set({ [HERO_COPY_KEY]: clean });
   return clean;
 }
@@ -974,6 +1007,16 @@ function beginHeroCopyEdit() {
   selectElementText(el);
 }
 
+function beginHeroTitleEdit() {
+  const el = document.getElementById('heroTitle');
+  if (!el || el.isContentEditable) return;
+  el.dataset.beforeEdit = el.textContent || '';
+  el.contentEditable = 'true';
+  el.classList.add('is-editing');
+  el.focus();
+  selectElementText(el);
+}
+
 async function saveHeroCopyEdit(el) {
   if (!el || !el.isContentEditable) return;
   const clean = await setHeroCopy(el.innerText || el.textContent || '');
@@ -984,11 +1027,28 @@ async function saveHeroCopyEdit(el) {
   showToast(t('heroCopyUpdated'));
 }
 
+async function saveHeroTitleEdit(el) {
+  if (!el || !el.isContentEditable) return;
+  const clean = await setHeroTitle(el.innerText || el.textContent || '');
+  el.contentEditable = 'false';
+  el.classList.remove('is-editing');
+  el.textContent = clean || getDefaultHeroTitle();
+  el.dataset.customHeroTitle = clean ? 'true' : 'false';
+  showToast(t('heroTitleUpdated'));
+}
+
 function cancelHeroCopyEdit(el) {
   if (!el || !el.isContentEditable) return;
   el.contentEditable = 'false';
   el.classList.remove('is-editing');
   el.textContent = el.dataset.beforeEdit || getDefaultHeroCopy();
+}
+
+function cancelHeroTitleEdit(el) {
+  if (!el || !el.isContentEditable) return;
+  el.contentEditable = 'false';
+  el.classList.remove('is-editing');
+  el.textContent = el.dataset.beforeEdit || getDefaultHeroTitle();
 }
 
 /* ----------------------------------------------------------------
@@ -1032,11 +1092,12 @@ function sanitizeTodoForExport(todo) {
 }
 
 async function buildExportPayload() {
-  const [favorites, favoriteSections, todos, profileImageDataUrl, heroCopy] = await Promise.all([
+  const [favorites, favoriteSections, todos, profileImageDataUrl, heroTitle, heroCopy] = await Promise.all([
     getFavorites(),
     getFavoriteSections(),
     getTodos(),
     getProfileImageDataUrl(),
+    getStoredHeroTitle(),
     getStoredHeroCopy(),
   ]);
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
@@ -1050,6 +1111,7 @@ async function buildExportPayload() {
       favoriteSections,
       favorites: favorites.map(sanitizeFavoriteForExport),
       todos: todos.map(sanitizeTodoForExport),
+      heroTitle,
       heroCopy,
       profileImageDataUrl: isImageDataUrl(profileImageDataUrl) ? profileImageDataUrl : '',
       theme,
@@ -1189,6 +1251,7 @@ async function importTabHomeDataFromFile(file) {
     const sections = normalizeImportedSections(data.favoriteSections);
     const favorites = normalizeImportedFavorites(data.favorites, sections);
     const todos = normalizeImportedTodos(data.todos);
+    const heroTitle = typeof data.heroTitle === 'string' ? data.heroTitle : '';
     const heroCopy = typeof data.heroCopy === 'string' ? data.heroCopy : '';
     const profileImageDataUrl = isImageDataUrl(data.profileImageDataUrl) ? data.profileImageDataUrl : '';
     const theme = data.theme === 'dark' ? 'dark' : data.theme === 'light' ? 'light' : null;
@@ -1198,6 +1261,7 @@ async function importTabHomeDataFromFile(file) {
       await setFavoriteSections(sections);
       await setFavorites(favorites);
       await setTodos(todos);
+      await setHeroTitle(heroTitle);
       await setHeroCopy(heroCopy);
       await setProfileImageDataUrl(profileImageDataUrl);
       if (theme) await TabHomeStorage.setTheme(theme);
@@ -1208,6 +1272,7 @@ async function importTabHomeDataFromFile(file) {
     await loadTheme();
     await migrateFavoritesToSections();
     await populateFavoriteSectionInput();
+    await paintHeroTitle();
     await paintHeroCopy();
     await paintProfileImage();
     await renderDashboard();
@@ -2141,49 +2206,6 @@ async function renderTodos() {
   }).join('');
 }
 
-function renderWorkspacesSummary(groups, pinnedGroups) {
-  const list = document.getElementById('workspacesList');
-  if (!list) return;
-
-  list.replaceChildren();
-  const visibleGroups = [...(pinnedGroups || []), ...(groups || [])].slice(0, 4);
-
-  if (visibleGroups.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'workspace-empty';
-    empty.textContent = currentLang === 'zh'
-      ? '没有打开的网页标签。现在很安静。'
-      : 'No web tabs open. Quiet in here.';
-    list.appendChild(empty);
-    return;
-  }
-
-  for (const group of visibleGroups) {
-    const firstTab = group.tabs && group.tabs[0];
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'workspace-card';
-    if (firstTab) {
-      button.dataset.action = 'focus-tab';
-      button.dataset.tabId = String(firstTab.id);
-      button.dataset.tabUrl = firstTab.url || '';
-    }
-
-    const name = document.createElement('span');
-    name.className = 'workspace-name';
-    name.textContent = group.domain === '__landing-pages__'
-      ? t('homepages')
-      : (group.label || friendlyDomain(group.domain));
-
-    const meta = document.createElement('span');
-    meta.className = 'workspace-meta';
-    meta.textContent = t('nTabsCount', (group.tabs || []).length);
-
-    button.append(name, meta);
-    list.appendChild(button);
-  }
-}
-
 /* ----------------------------------------------------------------
    CHROME PROFILE BOOKMARKS + READING LIST
 
@@ -2191,54 +2213,65 @@ function renderWorkspacesSummary(groups, pinnedGroups) {
    override does not make the browser's own Bookmarks and Lists feel hidden.
    Sources:
    - https://developer.chrome.com/docs/extensions/reference/api/bookmarks
-   - https://developer.chrome.com/docs/extensions/reference/api/readingList
    ---------------------------------------------------------------- */
 
 function hasChromeBookmarksApi() {
   return !!(chrome.bookmarks && typeof chrome.bookmarks.getTree === 'function');
 }
 
-function hasChromeReadingListApi() {
-  return !!(chrome.readingList && typeof chrome.readingList.query === 'function');
+async function loadBookmarkUiState() {
+  try {
+    const data = await chrome.storage.local.get([
+      'profileBookmarkCollapsedFolders',
+      'profileBookmarkExpandedFolders',
+    ]);
+    collapsedBookmarkFolders = new Set(data.profileBookmarkCollapsedFolders || []);
+    expandedBookmarkFolders = new Set(data.profileBookmarkExpandedFolders || []);
+  } catch {
+    collapsedBookmarkFolders = new Set();
+    expandedBookmarkFolders = new Set();
+  }
 }
 
-function countBookmarkLeaves(node) {
-  if (!node) return 0;
-  if (node.url) return 1;
-  return (node.children || []).reduce((sum, child) => sum + countBookmarkLeaves(child), 0);
+async function saveBookmarkUiState() {
+  try {
+    await chrome.storage.local.set({
+      profileBookmarkCollapsedFolders: Array.from(collapsedBookmarkFolders),
+      profileBookmarkExpandedFolders: Array.from(expandedBookmarkFolders),
+    });
+  } catch {}
 }
 
-function buildProfileBookmarkRows(nodes, depth = 0, rows = []) {
+function countBookmarkUrls(nodes = []) {
+  let count = 0;
   for (const node of nodes || []) {
     if (!node) continue;
-    if (node.url) {
-      rows.push({
-        type: 'bookmark',
-        id: node.id,
-        title: node.title || node.url,
-        url: node.url,
-        depth,
-      });
-      continue;
-    }
-
-    const childCount = countBookmarkLeaves(node);
-    if (childCount > 0 || (node.children && node.children.length > 0)) {
-      rows.push({
-        type: 'folder',
-        id: node.id,
-        title: node.title || t('profileBookmarks'),
-        count: childCount,
-        depth,
-      });
-    }
-    buildProfileBookmarkRows(node.children || [], depth + 1, rows);
+    if (shouldHideBookmarkNode(node)) continue;
+    if (node.url) count += 1;
+    if (node.children) count += countBookmarkUrls(node.children);
   }
-  return rows;
+  return count;
 }
 
-function renderProfileFolderIcon() {
-  return '<span class="profile-link-icon profile-folder-icon" aria-hidden="true"></span>';
+function countFolderChildren(node) {
+  return countBookmarkUrls(node?.children || []);
+}
+
+function collectBookmarkFolderIds(nodes = []) {
+  const ids = [];
+  for (const node of nodes || []) {
+    if (!node) continue;
+    if (shouldHideBookmarkNode(node)) continue;
+    if (!node.url && node.id) ids.push(node.id);
+    if (node.children) ids.push(...collectBookmarkFolderIds(node.children));
+  }
+  return ids;
+}
+
+function shouldHideBookmarkNode(node) {
+  if (!node || node.url) return false;
+  const title = String(node.title || '').trim().toLowerCase();
+  return node.id === '2' || title === 'other bookmarks';
 }
 
 function renderProfileBookmarkIcon(url) {
@@ -2248,38 +2281,52 @@ function renderProfileBookmarkIcon(url) {
   return `<img class="profile-link-icon profile-favicon" src="${safeIcon}" alt="">`;
 }
 
-function renderProfileBookmarkRow(row) {
-  const safeTitle = escapeHtml(row.title || '');
-  const depthClass = `depth-${Math.min(Math.max(row.depth || 0, 0), 3)}`;
-
-  if (row.type === 'folder') {
-    return `
-      <div class="profile-link-row is-folder ${depthClass}">
-        ${renderProfileFolderIcon()}
-        <span class="profile-link-title">${safeTitle}</span>
-        <span class="profile-link-meta">${row.count || 0}</span>
-      </div>`;
-  }
-
-  const safeUrl = (row.url || '').replace(/"/g, '&quot;');
+function renderBookmarkLeaf(node, depth = 0) {
+  const safeTitle = escapeHtml(node.title || node.url || '');
+  const safeUrl = (node.url || '').replace(/"/g, '&quot;');
   return `
-    <a class="profile-link-row ${depthClass}" href="${safeUrl}" target="_blank" rel="noopener noreferrer" title="${safeUrl}">
-      ${renderProfileBookmarkIcon(row.url)}
+    <a class="profile-link-row bookmark-leaf-row" href="${safeUrl}" target="_blank" rel="noopener noreferrer" title="${safeUrl}" style="--depth:${depth}">
+      ${renderProfileBookmarkIcon(node.url)}
       <span class="profile-link-title">${safeTitle}</span>
     </a>`;
 }
 
-function renderProfileReadingRow(item) {
-  const safeTitle = escapeHtml(item.title || item.url || '');
-  const safeUrl = (item.url || '').replace(/"/g, '&quot;');
-  const status = item.hasBeenRead ? t('profileRead') : t('profileUnread');
-  const statusClass = item.hasBeenRead ? 'is-read' : 'is-unread';
+function renderBookmarkFolder(node, depth = 0) {
+  const id = escapeHtml(node.id || '');
+  const title = escapeHtml(node.title || t('profileBookmarks'));
+  const total = countFolderChildren(node);
+  const isCollapsed = collapsedBookmarkFolders.has(node.id);
+  const isPreviewExpanded = expandedBookmarkFolders.has(node.id);
+  const children = node.children || [];
+  const visibleChildren = isPreviewExpanded
+    ? children
+    : children.slice(0, PROFILE_BOOKMARK_PREVIEW_LIMIT);
+  const remaining = Math.max(0, children.length - visibleChildren.length);
+
   return `
-    <a class="profile-link-row" href="${safeUrl}" target="_blank" rel="noopener noreferrer" title="${safeUrl}">
-      ${renderProfileBookmarkIcon(item.url)}
-      <span class="profile-link-title">${safeTitle}</span>
-      <span class="profile-link-meta ${statusClass}">${status}</span>
-    </a>`;
+    <div class="bookmark-tree-folder" data-bookmark-folder-id="${id}">
+      <button class="bookmark-folder-row" type="button" data-action="toggle-bookmark-folder" data-folder-id="${id}" style="--depth:${depth}">
+        <span class="bookmark-folder-chevron" aria-hidden="true">${isCollapsed ? '›' : '⌄'}</span>
+        <span class="bookmark-folder-icon" aria-hidden="true">▣</span>
+        <span class="bookmark-folder-title">${title}</span>
+        <small class="bookmark-folder-count">${total}</small>
+      </button>
+      <div class="bookmark-folder-children"${isCollapsed ? ' hidden' : ''}>
+        ${visibleChildren.map((child) => renderBookmarkTreeNode(child, depth + 1)).join('')}
+        ${remaining > 0 ? `
+          <button class="bookmark-view-more" type="button" data-action="expand-bookmark-folder-preview" data-folder-id="${id}" style="--depth:${depth + 1}">
+            ${escapeHtml(t('profileViewAll', children.length))}
+          </button>
+        ` : ''}
+      </div>
+    </div>`;
+}
+
+function renderBookmarkTreeNode(node, depth = 0) {
+  if (!node) return '';
+  if (shouldHideBookmarkNode(node)) return '';
+  if (node.url) return renderBookmarkLeaf(node, depth);
+  return renderBookmarkFolder(node, depth);
 }
 
 function renderProfileEmpty(message) {
@@ -2299,19 +2346,16 @@ async function renderProfileBookmarks() {
 
   try {
     const tree = await chrome.bookmarks.getTree();
-    const rows = buildProfileBookmarkRows(tree && tree[0] ? tree[0].children || [] : []);
-    const bookmarkCount = rows.filter(row => row.type === 'bookmark').length;
+    const roots = (tree?.[0]?.children || []).filter((node) => !shouldHideBookmarkNode(node));
+    const bookmarkCount = countBookmarkUrls(roots);
     count.textContent = String(bookmarkCount);
 
-    if (rows.length === 0) {
+    if (!bookmarkCount) {
       list.innerHTML = renderProfileEmpty(t('profileBookmarksEmpty'));
       return;
     }
 
-    const visibleRows = rows.slice(0, PROFILE_BOOKMARK_ROW_LIMIT);
-    const remaining = rows.length - visibleRows.length;
-    list.innerHTML = visibleRows.map(renderProfileBookmarkRow).join('') +
-      (remaining > 0 ? renderProfileEmpty(t('profileMoreItems', remaining)) : '');
+    list.innerHTML = roots.map((node) => renderBookmarkTreeNode(node, 0)).join('');
   } catch (error) {
     console.warn('[browser-organizer] bookmarks render failed:', error);
     count.textContent = '0';
@@ -2319,43 +2363,8 @@ async function renderProfileBookmarks() {
   }
 }
 
-async function renderProfileReadingList() {
-  const list = document.getElementById('profileReadingList');
-  const count = document.getElementById('profileReadingListCount');
-  if (!list || !count) return;
-
-  if (!hasChromeReadingListApi()) {
-    count.textContent = '0';
-    list.innerHTML = renderProfileEmpty(t('profileReadingUnavailable'));
-    return;
-  }
-
-  try {
-    const items = await chrome.readingList.query({});
-    const sorted = (items || []).sort((a, b) => (b.lastUpdateTime || b.creationTime || 0) - (a.lastUpdateTime || a.creationTime || 0));
-    count.textContent = String(sorted.length);
-
-    if (sorted.length === 0) {
-      list.innerHTML = renderProfileEmpty(t('profileReadingEmpty'));
-      return;
-    }
-
-    const visibleItems = sorted.slice(0, PROFILE_READING_ROW_LIMIT);
-    const remaining = sorted.length - visibleItems.length;
-    list.innerHTML = visibleItems.map(renderProfileReadingRow).join('') +
-      (remaining > 0 ? renderProfileEmpty(t('profileMoreItems', remaining)) : '');
-  } catch (error) {
-    console.warn('[browser-organizer] reading list render failed:', error);
-    count.textContent = '0';
-    list.innerHTML = renderProfileEmpty(t('profileReadingUnavailable'));
-  }
-}
-
 async function renderProfileLibrary() {
-  await Promise.all([
-    renderProfileBookmarks(),
-    renderProfileReadingList(),
-  ]);
+  await renderProfileBookmarks();
 }
 
 let _profileLibraryRenderTimer = null;
@@ -2544,7 +2553,6 @@ async function renderStaticDashboard() {
   const regularRealTabs = realTabs.filter(t => !t.pinned);
   pinnedDomainGroups = groupTabsByDomain(pinnedRealTabs);
   domainGroups       = groupTabsByDomain(regularRealTabs);
-  renderWorkspacesSummary(domainGroups, pinnedDomainGroups);
   renderSmartCleanup(realTabs);
   await renderTodos();
 
@@ -2644,8 +2652,10 @@ document.addEventListener('click', async (e) => {
   if (action === 'toggle-lang') {
     await saveLang(currentLang === 'zh' ? 'en' : 'zh');
     applyStaticI18n();
+    await paintHeroTitle();
     await paintHeroCopy();
     await renderDashboard();
+    await renderProfileLibrary();
     return;
   }
 
@@ -2666,6 +2676,43 @@ document.addEventListener('click', async (e) => {
     } catch {
       showToast(t('bookmarkManagerUnavailable'));
     }
+    return;
+  }
+
+  if (action === 'toggle-bookmark-folder') {
+    const folderId = actionEl.dataset.folderId;
+    if (!folderId) return;
+    if (collapsedBookmarkFolders.has(folderId)) collapsedBookmarkFolders.delete(folderId);
+    else collapsedBookmarkFolders.add(folderId);
+    await saveBookmarkUiState();
+    await renderProfileBookmarks();
+    return;
+  }
+
+  if (action === 'expand-bookmark-folder-preview') {
+    const folderId = actionEl.dataset.folderId;
+    if (!folderId) return;
+    expandedBookmarkFolders.add(folderId);
+    collapsedBookmarkFolders.delete(folderId);
+    await saveBookmarkUiState();
+    await renderProfileBookmarks();
+    return;
+  }
+
+  if (action === 'collapse-bookmarks') {
+    if (!hasChromeBookmarksApi()) return;
+    const tree = await chrome.bookmarks.getTree();
+    const roots = tree?.[0]?.children || [];
+    collapsedBookmarkFolders = new Set(collectBookmarkFolderIds(roots));
+    await saveBookmarkUiState();
+    await renderProfileBookmarks();
+    return;
+  }
+
+  if (action === 'expand-bookmarks') {
+    collapsedBookmarkFolders.clear();
+    await saveBookmarkUiState();
+    await renderProfileBookmarks();
     return;
   }
 
@@ -3073,12 +3120,33 @@ document.addEventListener('click', async (e) => {
 });
 
 document.addEventListener('dblclick', (e) => {
+  if (e.target.closest('#heroTitle')) {
+    beginHeroTitleEdit();
+    return;
+  }
   if (e.target.closest('#heroCopy')) {
     beginHeroCopyEdit();
   }
 });
 
 document.addEventListener('keydown', async (e) => {
+  const titleEl = e.target.closest && e.target.closest('#heroTitle');
+  if (titleEl && titleEl.isContentEditable) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelHeroTitleEdit(titleEl);
+      titleEl.blur();
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      await saveHeroTitleEdit(titleEl);
+      titleEl.blur();
+      return;
+    }
+  }
+
   const el = e.target.closest && e.target.closest('#heroCopy');
   if (!el || !el.isContentEditable) return;
 
@@ -3089,7 +3157,7 @@ document.addEventListener('keydown', async (e) => {
     return;
   }
 
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+  if (e.key === 'Enter') {
     e.preventDefault();
     await saveHeroCopyEdit(el);
     el.blur();
@@ -3097,6 +3165,12 @@ document.addEventListener('keydown', async (e) => {
 });
 
 document.addEventListener('focusout', async (e) => {
+  const titleEl = e.target.closest && e.target.closest('#heroTitle');
+  if (titleEl && titleEl.isContentEditable) {
+    await saveHeroTitleEdit(titleEl);
+    return;
+  }
+
   const el = e.target.closest && e.target.closest('#heroCopy');
   if (!el || !el.isContentEditable) return;
   await saveHeroCopyEdit(el);
@@ -3647,11 +3721,19 @@ if (chrome.storage && chrome.storage.onChanged) {
         populateFavoriteSectionInput();
       }
       if (changes.todos) renderTodos();
+      if (changes.heroTitle) {
+        const heroTitle = document.getElementById('heroTitle');
+        if (!heroTitle || !heroTitle.isContentEditable) paintHeroTitle();
+      }
       if (changes.heroCopy) {
         const heroCopy = document.getElementById('heroCopy');
         if (!heroCopy || !heroCopy.isContentEditable) paintHeroCopy();
       }
       if (changes.profileImageDataUrl) paintProfileImage();
+      if (changes.profileBookmarkCollapsedFolders || changes.profileBookmarkExpandedFolders) {
+        await loadBookmarkUiState();
+        renderProfileBookmarks();
+      }
       return;
     }
 
@@ -3666,13 +3748,6 @@ if (chrome.bookmarks) {
   chrome.bookmarks.onChildrenReordered?.addListener(scheduleProfileLibraryRender);
 }
 
-if (chrome.readingList) {
-  chrome.readingList.onEntryAdded?.addListener(scheduleProfileLibraryRender);
-  chrome.readingList.onEntryRemoved?.addListener(scheduleProfileLibraryRender);
-  chrome.readingList.onEntryUpdated?.addListener(scheduleProfileLibraryRender);
-}
-
-
 /* ----------------------------------------------------------------
    INITIALIZE
    ---------------------------------------------------------------- */
@@ -3683,11 +3758,13 @@ if (chrome.readingList) {
   await migrateAwayFromFolders();
   await migrateFavoritesToSections();
   applyStaticI18n();
+  await paintHeroTitle();
   await paintHeroCopy();
   await populateFavoriteSectionInput();
   await paintProfileImage();
   paintTopbarTime();
   setInterval(paintTopbarTime, 30000);
   await renderDashboard();
+  await loadBookmarkUiState();
   await renderProfileLibrary();
 })();
