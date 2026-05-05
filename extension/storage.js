@@ -140,7 +140,7 @@
 
     if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
 
-    return {
+    const task = {
       id:
         typeof value.id === "string" && value.id
           ? value.id
@@ -161,6 +161,16 @@
           ? value.updatedAt
           : new Date().toISOString(),
     };
+
+    if (typeof value.repeatGroupId === "string" && value.repeatGroupId) {
+      task.repeatGroupId = value.repeatGroupId;
+    }
+    if (value.overdue) task.overdue = true;
+    if (typeof value.originalDate === "string" && value.originalDate) {
+      task.originalDate = value.originalDate;
+    }
+
+    return task;
   }
 
   function normalizeDailyTasks(value) {

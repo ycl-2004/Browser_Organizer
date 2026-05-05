@@ -1179,11 +1179,19 @@ function ensurePlannerSelection() {
 async function pruneExpiredDailyTasks() {
   const todayKey = toLocalDateKey(new Date());
   const maxKey = getPlannerMaxDateKey();
+  const todayStart = new Date(todayKey + "T00:00:00").toISOString();
   let changed = false;
 
   const kept = [];
   for (const task of dailyTasks) {
     if (task.date > maxKey) continue; // beyond planner range — drop
+
+    // Done tasks completed before today → delete (隔天就删)
+    if (task.done && task.updatedAt && task.updatedAt < todayStart) {
+      changed = true;
+      continue;
+    }
+
     if (task.date < todayKey) {
       if (task.done) {
         changed = true;
@@ -1236,6 +1244,12 @@ function renderDailyTaskRow(task) {
     task.overdue && !task.done
       ? `<span class="todo-overdue-badge">OVERDUE</span>`
       : "";
+  const repeatBadge = task.repeatGroupId
+    ? `<span class="todo-repeat-badge" title="Recurring task">↻</span>`
+    : "";
+  const repeatDeleteBtn = task.repeatGroupId
+    ? `<button class="todo-delete-series" type="button" data-action="delete-repeat-group" data-task-id="${id}" aria-label="Delete all future in series" title="Delete all future">↻×</button>`
+    : "";
 
   return `
     <div class="todo-item daily-task-row${doneClass}${overdueClass}" data-task-id="${id}" draggable="true">
@@ -1243,9 +1257,9 @@ function renderDailyTaskRow(task) {
       <label class="todo-check-wrap" aria-label="${task.done ? "Done" : "Pending"}">
         <input type="checkbox" data-action="toggle-daily-task" data-task-id="${id}" ${checked}>
       </label>
-      <span class="todo-title">${title}${overdueBadge}</span>
+      <span class="todo-title">${title}${repeatBadge}${overdueBadge}</span>
       <span class="todo-tag">${tag}</span>
-      <button class="todo-delete" type="button" data-action="delete-daily-task" data-task-id="${id}" aria-label="Delete task">×</button>
+      <span class="todo-actions">${repeatDeleteBtn}<button class="todo-delete" type="button" data-action="delete-daily-task" data-task-id="${id}" aria-label="Delete task">×</button></span>
     </div>
   `;
 }
@@ -1375,7 +1389,12 @@ function renderDailyPlanner() {
   renderSelectedDayPanel();
 }
 
-async function addDailyTask(title, tag, dateKey) {
+async function addDailyTask(
+  title,
+  tag,
+  dateKey,
+  { repeatGroupId, skipRender } = {},
+) {
   const cleanTitle = String(title || "").trim();
   if (!cleanTitle) return false;
   if (!isDateInPlannerRange(dateKey)) {
@@ -1384,7 +1403,7 @@ async function addDailyTask(title, tag, dateKey) {
   }
 
   const now = new Date().toISOString();
-  dailyTasks.push({
+  const task = {
     id: makeId("task"),
     title: cleanTitle,
     tag: tag || "Work",
@@ -1392,8 +1411,27 @@ async function addDailyTask(title, tag, dateKey) {
     done: false,
     createdAt: now,
     updatedAt: now,
-  });
+  };
+  if (repeatGroupId) task.repeatGroupId = repeatGroupId;
+  dailyTasks.push(task);
 
+  if (!skipRender) {
+    await persistDailyTasks();
+    renderDailyPlanner();
+  }
+  return true;
+}
+
+async function deleteRepeatGroupFuture(taskId) {
+  const task = dailyTasks.find((t) => t.id === taskId);
+  if (!task || !task.repeatGroupId) return false;
+  const groupId = task.repeatGroupId;
+  const todayKey = toLocalDateKey(new Date());
+  const before = dailyTasks.length;
+  dailyTasks = dailyTasks.filter(
+    (t) => !(t.repeatGroupId === groupId && t.date >= todayKey),
+  );
+  if (dailyTasks.length === before) return false;
   await persistDailyTasks();
   renderDailyPlanner();
   return true;
@@ -1685,7 +1723,7 @@ function sanitizeFavoriteForExport(favorite) {
 }
 
 function sanitizeDailyTaskForExport(task) {
-  return {
+  const out = {
     id: task.id,
     title: task.title,
     tag: task.tag || "Work",
@@ -1700,6 +1738,10 @@ function sanitizeDailyTaskForExport(task) {
         ? task.updatedAt
         : new Date().toISOString(),
   };
+  if (task.repeatGroupId) out.repeatGroupId = task.repeatGroupId;
+  if (task.overdue) out.overdue = true;
+  if (task.originalDate) out.originalDate = task.originalDate;
+  return out;
 }
 
 async function buildExportPayload() {
@@ -3820,6 +3862,16 @@ async function renderStaticDashboard() {
 
 async function renderDashboard() {
   await renderStaticDashboard();
+  // Prune tabStatuses for URLs no longer open in any tab
+  const openUrls = new Set(openTabs.map((t) => t.url));
+  let pruned = false;
+  for (const url of Object.keys(tabStatuses)) {
+    if (!openUrls.has(url)) {
+      delete tabStatuses[url];
+      pruned = true;
+    }
+  }
+  if (pruned) await TabHomeStorage.setTabStatuses(tabStatuses);
 }
 
 /* ----------------------------------------------------------------
@@ -3925,9 +3977,63 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "delete-repeat-group") {
+    const id = actionEl.dataset.taskId;
+    if (!id) return;
+    const task = dailyTasks.find((t) => t.id === id);
+    if (!task || !task.repeatGroupId) return;
+    const count = dailyTasks.filter(
+      (t) =>
+        t.repeatGroupId === task.repeatGroupId &&
+        t.date >= toLocalDateKey(new Date()),
+    ).length;
+    const ok = await showConfirm({
+      message: `Delete all ${count} future tasks in this recurring series?`,
+      okLabel: "Delete all",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
+    await deleteRepeatGroupFuture(id);
+    showToast(`Deleted ${count} recurring tasks`);
+    return;
+  }
+
   if (action === "delete-daily-task") {
     const id = actionEl.dataset.taskId;
     if (!id) return;
+    const task = dailyTasks.find((t) => t.id === id);
+    if (!task) return;
+
+    // Check if there are sibling tasks (same repeatGroupId, or same title on other future dates)
+    const todayKey = toLocalDateKey(new Date());
+    const siblings = dailyTasks.filter((t) => {
+      if (t.id === id) return false;
+      if (t.date < todayKey) return false;
+      if (task.repeatGroupId && t.repeatGroupId === task.repeatGroupId)
+        return true;
+      if (t.title === task.title && !task.repeatGroupId) return true;
+      return false;
+    });
+
+    if (siblings.length > 0) {
+      const total = siblings.length + 1;
+      const ok = await showConfirm({
+        message: `"${task.title}" appears on ${total} future dates.\n\nDelete ALL ${total}, or just this one?`,
+        okLabel: `Delete all ${total}`,
+        cancelLabel: "Just this one",
+      });
+      if (ok) {
+        // Delete all siblings + this task
+        const removeIds = new Set(siblings.map((t) => t.id));
+        removeIds.add(id);
+        dailyTasks = dailyTasks.filter((t) => !removeIds.has(t.id));
+        await persistDailyTasks();
+        renderDailyPlanner();
+        showToast(`Deleted ${total} tasks`);
+        return;
+      }
+    }
+
     await deleteDailyTask(id);
     return;
   }
@@ -5243,6 +5349,7 @@ document.addEventListener("submit", async (e) => {
   // Generate repeating tasks from selected date up to planner max
   const startDate = parseLocalDateKey(selectedPlannerDate);
   const maxKey = getPlannerMaxDateKey();
+  const groupId = makeId("rg");
   let count = 0;
   const cursor = new Date(startDate);
   while (toLocalDateKey(cursor) <= maxKey) {
@@ -5255,13 +5362,18 @@ document.addEventListener("submit", async (e) => {
     else if (repeat === "weekly") shouldAdd = true;
 
     if (shouldAdd && isDateInPlannerRange(dateKey)) {
-      const ok = await addDailyTask(title, tag, dateKey);
+      const ok = await addDailyTask(title, tag, dateKey, {
+        repeatGroupId: groupId,
+        skipRender: true,
+      });
       if (ok) count++;
     }
     cursor.setDate(cursor.getDate() + (repeat === "weekly" ? 7 : 1));
   }
 
   if (count > 0) {
+    await persistDailyTasks();
+    renderDailyPlanner();
     input.value = "";
     if (repeatInput) repeatInput.value = "";
     input.focus();
