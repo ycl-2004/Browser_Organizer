@@ -177,6 +177,65 @@ chrome.tabs.onUpdated.addListener(() => {
   updateBadge();
 });
 
+// ─── Weather proxy ────────────────────────────────────────────────────────────
+// Extension pages have a restrictive default CSP that can block direct fetch()
+// calls to external origins. Service workers are not subject to this CSP, so
+// we proxy the two weather API calls through here via message passing.
+
+async function fetchGeoLocation() {
+  // Primary: ipapi.co (HTTPS, free, 1000 req/day — well within 30-min cache)
+  try {
+    const res = await fetch("https://ipapi.co/json/");
+    if (res.ok) {
+      const d = await res.json();
+      if (d.latitude != null)
+        return {
+          lat: d.latitude,
+          lon: d.longitude,
+          city: d.city || d.region || "",
+        };
+    }
+  } catch {}
+  // Fallback: geojs.io (open-source, no rate limit)
+  const res2 = await fetch("https://get.geojs.io/v1/ip/geo.json");
+  if (!res2.ok) throw new Error(`geo fallback HTTP ${res2.status}`);
+  const d2 = await res2.json();
+  if (d2.latitude == null) throw new Error("geo data invalid");
+  return {
+    lat: parseFloat(d2.latitude),
+    lon: parseFloat(d2.longitude),
+    city: d2.city || d2.name || "",
+  };
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type !== "fetch-weather") return false;
+  (async () => {
+    try {
+      const geo = await fetchGeoLocation();
+      const weatherUrl =
+        `https://api.open-meteo.com/v1/forecast` +
+        `?latitude=${geo.lat}&longitude=${geo.lon}` +
+        `&current=temperature_2m,weather_code&timezone=auto`;
+      const weatherRes = await fetch(weatherUrl);
+      if (!weatherRes.ok) throw new Error(`weather HTTP ${weatherRes.status}`);
+      const weather = await weatherRes.json();
+      sendResponse({
+        ok: true,
+        data: {
+          city: geo.city,
+          temp: Math.round(weather.current.temperature_2m),
+          code: weather.current.weather_code,
+          fetchedAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      sendResponse({ ok: false, error: err.message });
+    }
+  })();
+  return true;
+});
+
 // ─── Initial run ─────────────────────────────────────────────────────────────
 
 // Run once immediately when the service worker first loads

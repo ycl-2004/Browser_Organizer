@@ -288,16 +288,24 @@ async function saveLang(lang) {
 }
 
 /* ----------------------------------------------------------------
-   THEME — 'light' or 'dark', stored locally
+   THEME — 'light' | 'dark' | 'pink' | 'lavender' | 'sky' | 'sand'
    ---------------------------------------------------------------- */
-const ICON_SUN = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>`;
-const ICON_MOON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>`;
+const VALID_THEMES = ["light", "dark", "pink", "lavender", "sky", "sand"];
+const THEME_DOT_COLOR = {
+  light: "#f8f5f0",
+  dark: "#2f2c29",
+  pink: "#d4a5c1",
+  lavender: "#b19cd9",
+  sky: "#6c8ff5",
+  sand: "#d1c0a8",
+};
 
 async function loadTheme() {
   try {
     const theme = await TabHomeStorage.getTheme();
-    const t = theme === "dark" ? "dark" : "light";
-    document.documentElement.dataset.theme = t;
+    document.documentElement.dataset.theme = VALID_THEMES.includes(theme)
+      ? theme
+      : "light";
   } catch {
     document.documentElement.dataset.theme = "light";
   }
@@ -307,20 +315,36 @@ async function loadTheme() {
 function paintThemeToggle() {
   const btn = document.getElementById("themeToggle");
   if (!btn) return;
-  const isDark = document.documentElement.dataset.theme === "dark";
-  btn.innerHTML = isDark ? ICON_SUN : ICON_MOON;
+  const theme = document.documentElement.dataset.theme || "light";
+  const color = THEME_DOT_COLOR[theme] || THEME_DOT_COLOR.light;
+  btn.innerHTML = `<span class="theme-current-dot" style="background:${color}"></span>`;
+  document.querySelectorAll(".theme-option[data-theme-id]").forEach((opt) => {
+    opt.classList.toggle("is-active", opt.dataset.themeId === theme);
+  });
 }
 
-async function toggleTheme() {
-  const cur =
-    document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-  const next = cur === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = next;
+function openThemeDropdown() {
+  document.getElementById("themeDropdown")?.classList.add("open");
+}
+
+function closeThemeDropdown() {
+  document.getElementById("themeDropdown")?.classList.remove("open");
+}
+
+async function applyTheme(themeId) {
+  if (!VALID_THEMES.includes(themeId)) return;
+  document.documentElement.dataset.theme = themeId;
   paintThemeToggle();
+  closeThemeDropdown();
   try {
-    await TabHomeStorage.setTheme(next);
+    await TabHomeStorage.setTheme(themeId);
   } catch {}
 }
+
+// Close theme dropdown when clicking outside it
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#themePickerWrap")) closeThemeDropdown();
+});
 
 /**
  * applyStaticI18n()
@@ -1583,8 +1607,8 @@ async function buildExportPayload() {
     getStoredHeroCopy(),
     TabHomeStorage.getLang(),
   ]);
-  const theme =
-    document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+  const curTheme = document.documentElement.dataset.theme;
+  const theme = VALID_THEMES.includes(curTheme) ? curTheme : "light";
 
   return {
     app: EXPORT_APP_ID,
@@ -1835,8 +1859,7 @@ async function importTabHomeDataFromFile(file) {
     const profileImageDataUrl = isImageDataUrl(data.profileImageDataUrl)
       ? data.profileImageDataUrl
       : "";
-    const theme =
-      data.theme === "dark" ? "dark" : data.theme === "light" ? "light" : null;
+    const theme = VALID_THEMES.includes(data.theme) ? data.theme : null;
     const lang = data.lang === "zh" || data.lang === "en" ? data.lang : null;
 
     _suppressFavReRender++;
@@ -2145,6 +2168,72 @@ function paintTopbarTime() {
 }
 
 /* ----------------------------------------------------------------
+   WEATHER — IP geolocation (ipwho.is) + Open-Meteo
+   Both services are free, global, and require no API key.
+   Results are cached in chrome.storage.local for 30 minutes.
+   ---------------------------------------------------------------- */
+const WEATHER_CACHE_TTL = 30 * 60 * 1000;
+
+function wmoCodeToEmoji(code) {
+  if (code === 0) return "☀️";
+  if (code === 1) return "🌤️";
+  if (code === 2) return "⛅";
+  if (code === 3) return "☁️";
+  if (code <= 48) return "🌫️";
+  if (code <= 55) return "🌦️";
+  if (code <= 67) return "🌧️";
+  if (code <= 77) return "🌨️";
+  if (code <= 82) return "🌦️";
+  if (code <= 86) return "❄️";
+  if (code >= 95) return "⛈️";
+  return "🌡️";
+}
+
+function fetchWeatherFromApi() {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type: "fetch-weather" }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (!response || !response.ok) {
+        reject(new Error(response?.error || "weather fetch failed"));
+        return;
+      }
+      resolve(response.data);
+    });
+  });
+}
+
+async function loadAndPaintWeather() {
+  const locationEl = document.getElementById("locationDisplay");
+  const weatherEl = document.getElementById("weatherDisplay");
+  if (!locationEl || !weatherEl) return;
+  try {
+    const cached = await chrome.storage.local.get("weatherCache");
+    const cache = cached.weatherCache;
+    let data;
+    if (
+      cache &&
+      cache.fetchedAt &&
+      Date.now() - cache.fetchedAt < WEATHER_CACHE_TTL
+    ) {
+      data = cache;
+    } else {
+      data = await fetchWeatherFromApi();
+      await chrome.storage.local.set({ weatherCache: data });
+    }
+    locationEl.textContent =
+      data.city || (currentLang === "zh" ? "本地" : "Local");
+    weatherEl.textContent = `${wmoCodeToEmoji(data.code)} ${data.temp}°C`;
+  } catch (err) {
+    console.error("[browser-organizer] weather failed:", err);
+    locationEl.textContent = currentLang === "zh" ? "本地" : "Local";
+    weatherEl.textContent = currentLang === "zh" ? "天气未开启" : "Weather off";
+  }
+}
+
+/* ----------------------------------------------------------------
    DOMAIN & TITLE CLEANUP HELPERS
    ---------------------------------------------------------------- */
 
@@ -2420,6 +2509,10 @@ document.addEventListener(
   (e) => {
     const img = e.target;
     if (!(img instanceof HTMLImageElement)) return;
+    if (img.classList.contains("chip-favicon")) {
+      img.style.display = "none";
+      return;
+    }
     if (img.classList.contains("profile-favicon")) {
       const fallback = document.createElement("span");
       fallback.className = "profile-link-icon profile-page-icon";
@@ -2631,7 +2724,7 @@ function buildOverflowChips(
       const isPinned = !!tab.pinned;
       const faviconUrl = getFaviconUrl(tab.url, 32);
       return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
-      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ""}
+      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
       <span class="chip-text">${safeTitle}</span>${dupeTag}
       <div class="chip-actions">
         <button class="chip-action chip-star${isFav ? " active" : ""}" data-action="favorite-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="${isFav ? t("removeFromFav") : t("addToFav")}">
@@ -2713,7 +2806,7 @@ function renderDomainCard(group, favoritedUrls = new Set()) {
         const isPinned = !!tab.pinned;
         const faviconUrl = getFaviconUrl(tab.url, 32);
         return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
-      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ""}
+      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
       <span class="chip-text">${safeTitle}</span>${dupeTag}
       <div class="chip-actions">
         <button class="chip-action chip-star${isFav ? " active" : ""}" data-action="favorite-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="${isFav ? t("removeFromFav") : t("addToFav")}">
@@ -3397,14 +3490,23 @@ document.addEventListener("click", async (e) => {
     applyStaticI18n();
     await paintHeroTitle();
     await paintHeroCopy();
+    loadAndPaintWeather();
     await renderDashboard();
     await renderProfileLibrary();
     return;
   }
 
-  // ---- Theme toggle (light / dark) ----
+  // ---- Theme picker: toggle dropdown open/close ----
   if (action === "toggle-theme") {
-    await toggleTheme();
+    const dropdown = document.getElementById("themeDropdown");
+    if (dropdown?.classList.contains("open")) closeThemeDropdown();
+    else openThemeDropdown();
+    return;
+  }
+
+  // ---- Theme picker: apply selected theme ----
+  if (action === "select-theme") {
+    await applyTheme(actionEl.dataset.themeId);
     return;
   }
 
@@ -4715,7 +4817,18 @@ if (chrome.bookmarks) {
   await populateFavoriteSectionInput();
   await paintProfileImage();
   paintTopbarTime();
-  setInterval(paintTopbarTime, 30000);
+  // Align the tick to the next exact minute boundary so the displayed time
+  // never lags behind the system clock by more than ~50 ms.
+  (function scheduleMinuteTick() {
+    const now = new Date();
+    const msToNextMinute =
+      (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 50;
+    setTimeout(() => {
+      paintTopbarTime();
+      setInterval(paintTopbarTime, 60000);
+    }, msToNextMinute);
+  })();
+  loadAndPaintWeather();
   await renderDashboard();
   await loadBookmarkUiState();
   await renderProfileLibrary();

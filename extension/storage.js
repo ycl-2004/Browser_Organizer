@@ -11,63 +11,66 @@
    ================================================================ */
 
 (function (root) {
-  'use strict';
+  "use strict";
 
   const LOCAL_KEYS = {
-    favorites: 'favorites',
-    favoriteSections: 'favoriteSections',
-    dailyTasks: 'dailyTasks',
-    lang: 'lang',
-    theme: 'theme',
+    favorites: "favorites",
+    favoriteSections: "favoriteSections",
+    dailyTasks: "dailyTasks",
+    lang: "lang",
+    theme: "theme",
   };
 
   const META_KEYS = {
-    favorites: '__tabHomeFavoritesUpdatedAt',
-    favoriteSections: '__tabHomeFavoriteSectionsUpdatedAt',
-    dailyTasks: '__tabHomeDailyTasksUpdatedAt',
-    lang: '__tabHomeLangUpdatedAt',
-    theme: '__tabHomeThemeUpdatedAt',
+    favorites: "__tabHomeFavoritesUpdatedAt",
+    favoriteSections: "__tabHomeFavoriteSectionsUpdatedAt",
+    dailyTasks: "__tabHomeDailyTasksUpdatedAt",
+    lang: "__tabHomeLangUpdatedAt",
+    theme: "__tabHomeThemeUpdatedAt",
   };
 
   const LEGACY_SYNC_KEYS = [
-    '__tabHomeSyncFavoritesIndex',
-    '__tabHomeSyncFavoriteSections',
-    '__tabHomeSyncLang',
-    '__tabHomeSyncTheme',
+    "__tabHomeSyncFavoritesIndex",
+    "__tabHomeSyncFavoriteSections",
+    "__tabHomeSyncLang",
+    "__tabHomeSyncTheme",
   ];
-  const LEGACY_SYNC_FAVORITE_PREFIX = '__tabHomeSyncFavorite__';
-  const LEGACY_SYNC_CLEANED_KEY = '__tabHomeLegacySyncCleanedAt';
+  const LEGACY_SYNC_FAVORITE_PREFIX = "__tabHomeSyncFavorite__";
+  const LEGACY_SYNC_CLEANED_KEY = "__tabHomeLegacySyncCleanedAt";
 
   function isLang(value) {
-    return value === 'en' || value === 'zh';
+    return value === "en" || value === "zh";
   }
 
   function isTheme(value) {
-    return value === 'light' || value === 'dark';
+    return ["light", "dark", "pink", "lavender", "sky", "sand"].includes(value);
   }
 
   function normalizeFavorite(value) {
-    if (!value || typeof value !== 'object' || !value.url) return null;
+    if (!value || typeof value !== "object" || !value.url) return null;
 
     const url = String(value.url);
     const favorite = {
-      id: typeof value.id === 'string' && value.id ? value.id : `fav:${url}`,
+      id: typeof value.id === "string" && value.id ? value.id : `fav:${url}`,
       url,
-      title: typeof value.title === 'string' && value.title ? value.title : url,
-      addedAt: typeof value.addedAt === 'string' && value.addedAt ? value.addedAt : new Date(0).toISOString(),
-      slot: typeof value.slot === 'number' && value.slot >= 0 ? value.slot : 0,
+      title: typeof value.title === "string" && value.title ? value.title : url,
+      addedAt:
+        typeof value.addedAt === "string" && value.addedAt
+          ? value.addedAt
+          : new Date(0).toISOString(),
+      slot: typeof value.slot === "number" && value.slot >= 0 ? value.slot : 0,
     };
 
-    if (typeof value.customLogo === 'string' && value.customLogo) {
+    if (typeof value.customLogo === "string" && value.customLogo) {
       favorite.customLogo = value.customLogo;
     }
-    if (typeof value.iconUrl === 'string' && value.iconUrl) {
+    if (typeof value.iconUrl === "string" && value.iconUrl) {
       favorite.iconUrl = value.iconUrl;
     }
-    if (typeof value.sectionId === 'string' && value.sectionId) {
+    if (typeof value.sectionId === "string" && value.sectionId) {
       favorite.sectionId = value.sectionId;
     }
-    if (typeof value.sectionSlot === 'number' && value.sectionSlot >= 0) {
+    if (typeof value.sectionSlot === "number" && value.sectionSlot >= 0) {
       favorite.sectionSlot = value.sectionSlot;
     }
 
@@ -77,20 +80,29 @@
   function normalizeFavoriteArray(value) {
     if (!Array.isArray(value)) return [];
     return value
-      .filter((favorite) => favorite && favorite.type !== 'folder' && favorite.url)
+      .filter(
+        (favorite) => favorite && favorite.type !== "folder" && favorite.url,
+      )
       .map(normalizeFavorite)
       .filter(Boolean);
   }
 
   function normalizeFavoriteSection(value, index = 0) {
-    if (!value || typeof value !== 'object') return null;
-    const rawId = typeof value.id === 'string' && value.id ? value.id : `section-${index}`;
+    if (!value || typeof value !== "object") return null;
+    const rawId =
+      typeof value.id === "string" && value.id ? value.id : `section-${index}`;
     const id = /^[a-zA-Z0-9:_-]+$/.test(rawId) ? rawId : `section-${index}`;
-    const name = typeof value.name === 'string' && value.name.trim() ? value.name.trim() : 'Favorites';
+    const name =
+      typeof value.name === "string" && value.name.trim()
+        ? value.name.trim()
+        : "Favorites";
     return {
       id,
       name,
-      order: typeof value.order === 'number' && value.order >= 0 ? value.order : index,
+      order:
+        typeof value.order === "number" && value.order >= 0
+          ? value.order
+          : index,
       collapsed: !!value.collapsed,
     };
   }
@@ -100,38 +112,52 @@
     const sections = raw
       .map(normalizeFavoriteSection)
       .filter(Boolean)
-      .filter((section, index, all) => all.findIndex(s => s.id === section.id) === index)
+      .filter(
+        (section, index, all) =>
+          all.findIndex((s) => s.id === section.id) === index,
+      )
       .sort((a, b) => a.order - b.order);
 
-    if (!sections.some(section => section.id === 'default')) {
-      sections.unshift({ id: 'default', name: 'Favorites', order: 0, collapsed: false });
+    if (!sections.some((section) => section.id === "default")) {
+      sections.unshift({
+        id: "default",
+        name: "Favorites",
+        order: 0,
+        collapsed: false,
+      });
     }
 
     return sections.map((section, index) => ({ ...section, order: index }));
   }
 
   function normalizeDailyTask(value) {
-    if (!value || typeof value !== 'object') return null;
+    if (!value || typeof value !== "object") return null;
 
-    const title = typeof value.title === 'string' ? value.title.trim() : '';
-    const date = typeof value.date === 'string' ? value.date.trim() : '';
+    const title = typeof value.title === "string" ? value.title.trim() : "";
+    const date = typeof value.date === "string" ? value.date.trim() : "";
 
     if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
 
     return {
-      id: typeof value.id === 'string' && value.id
-        ? value.id
-        : `task-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      id:
+        typeof value.id === "string" && value.id
+          ? value.id
+          : `task-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       title,
-      tag: typeof value.tag === 'string' && value.tag.trim() ? value.tag.trim() : 'Work',
+      tag:
+        typeof value.tag === "string" && value.tag.trim()
+          ? value.tag.trim()
+          : "Work",
       date,
       done: !!value.done,
-      createdAt: typeof value.createdAt === 'string' && value.createdAt
-        ? value.createdAt
-        : new Date().toISOString(),
-      updatedAt: typeof value.updatedAt === 'string' && value.updatedAt
-        ? value.updatedAt
-        : new Date().toISOString(),
+      createdAt:
+        typeof value.createdAt === "string" && value.createdAt
+          ? value.createdAt
+          : new Date().toISOString(),
+      updatedAt:
+        typeof value.updatedAt === "string" && value.updatedAt
+          ? value.updatedAt
+          : new Date().toISOString(),
     };
   }
 
@@ -219,7 +245,10 @@
 
       const syncData = await chrome.storage.sync.get(null);
       const staleKeys = Object.keys(syncData || {}).filter((key) => {
-        return LEGACY_SYNC_KEYS.includes(key) || key.startsWith(LEGACY_SYNC_FAVORITE_PREFIX);
+        return (
+          LEGACY_SYNC_KEYS.includes(key) ||
+          key.startsWith(LEGACY_SYNC_FAVORITE_PREFIX)
+        );
       });
 
       if (staleKeys.length > 0) {
@@ -228,7 +257,7 @@
       await chrome.storage.local.set({ [LEGACY_SYNC_CLEANED_KEY]: Date.now() });
       return staleKeys.length > 0;
     } catch (error) {
-      console.warn('[wolfy] legacy sync cleanup failed:', error);
+      console.warn("[wolfy] legacy sync cleanup failed:", error);
       return false;
     }
   }
@@ -248,4 +277,4 @@
     setLang,
     setTheme,
   });
-})(typeof self !== 'undefined' ? self : window);
+})(typeof self !== "undefined" ? self : window);

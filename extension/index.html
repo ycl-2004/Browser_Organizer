@@ -94,12 +94,64 @@
           <button class="lang-toggle" id="langToggle" data-action="toggle-lang">
             中
           </button>
-          <button
-            class="theme-toggle"
-            id="themeToggle"
-            data-action="toggle-theme"
-            title="Toggle theme"
-          ></button>
+          <div class="theme-picker-wrap" id="themePickerWrap">
+            <button
+              class="theme-toggle"
+              id="themeToggle"
+              data-action="toggle-theme"
+              title="Change theme"
+            ></button>
+            <div class="theme-dropdown" id="themeDropdown">
+              <button
+                class="theme-option"
+                data-action="select-theme"
+                data-theme-id="light"
+              >
+                <span class="theme-swatch theme-swatch-light"></span>
+                <span>Light</span>
+              </button>
+              <button
+                class="theme-option"
+                data-action="select-theme"
+                data-theme-id="dark"
+              >
+                <span class="theme-swatch theme-swatch-dark"></span>
+                <span>Dark</span>
+              </button>
+              <button
+                class="theme-option"
+                data-action="select-theme"
+                data-theme-id="pink"
+              >
+                <span class="theme-swatch theme-swatch-pink"></span>
+                <span>Blush</span>
+              </button>
+              <button
+                class="theme-option"
+                data-action="select-theme"
+                data-theme-id="lavender"
+              >
+                <span class="theme-swatch theme-swatch-lavender"></span>
+                <span>Lavender</span>
+              </button>
+              <button
+                class="theme-option"
+                data-action="select-theme"
+                data-theme-id="sky"
+              >
+                <span class="theme-swatch theme-swatch-sky"></span>
+                <span>Sky</span>
+              </button>
+              <button
+                class="theme-option"
+                data-action="select-theme"
+                data-theme-id="sand"
+              >
+                <span class="theme-swatch theme-swatch-sand"></span>
+                <span>Sand</span>
+              </button>
+            </div>
+          </div>
           <label
             class="profile-avatar"
             for="profileImageInput"
@@ -535,10 +587,7 @@
 
     <!-- Personal config (gitignored) — defines LOCAL_LANDING_PAGE_PATTERNS etc. -->
     <!-- If the file doesn't exist, that's fine — app.js uses sensible defaults. -->
-    <script
-      src="config.local.js"
-      onerror="/* no personal config, that's fine */"
-    ></script>
+    <script src="config.local.js"></script>
 
     <!-- Shared storage helpers: local-only UI state plus JSON backup / restore -->
     <script src="storage.js"></script>

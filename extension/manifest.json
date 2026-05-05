@@ -3,8 +3,19 @@
   "name": "Browser Organizer",
   "version": "1.0.0",
   "description": "Browser Organizer — your personal new tab page. Long-term favorites, open tabs by domain, save for later.",
-  "permissions": ["tabs", "activeTab", "storage", "contextMenus", "favicon", "bookmarks", "readingList"],
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "contextMenus",
+    "favicon",
+    "bookmarks",
+    "readingList"
+  ],
   "host_permissions": ["<all_urls>"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://ipapi.co https://get.geojs.io https://api.open-meteo.com;"
+  },
   "chrome_url_overrides": { "newtab": "index.html" },
   "background": { "service_worker": "background.js" },
   "action": {
