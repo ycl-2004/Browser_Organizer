@@ -2568,6 +2568,23 @@ function getRealTabs() {
 }
 
 /**
+ * getDisplayTabs()
+ *
+ * Returns tabs to show in the domain cards panel — all tabs except
+ * truly blank/useless ones. Includes chrome:// and chrome-extension://
+ * pages so the user can manage the full tab set from one place.
+ */
+function getDisplayTabs() {
+  return openTabs.filter((t) => {
+    const url = t.url || "";
+    if (!url) return false;
+    if (url.startsWith("about:")) return false;
+    if (url.startsWith("edge://") || url.startsWith("brave://")) return false;
+    return true;
+  });
+}
+
+/**
  * checkTabOutDupes()
  *
  * Counts how many tab-out pages are open. If more than 1,
@@ -3161,6 +3178,36 @@ async function renderStaticDashboard() {
     const groupMap = {};
     const landing = [];
     for (const tab of tabs) {
+      // Handle chrome:// pages (Extensions, Settings, History, etc.)
+      if (tab.url && tab.url.startsWith("chrome://")) {
+        try {
+          const hostname = new URL(tab.url).hostname || "chrome";
+          const key = "chrome://" + hostname;
+          if (!groupMap[key]) {
+            const label =
+              hostname.charAt(0).toUpperCase() +
+              hostname.slice(1).replace(/-/g, " ");
+            groupMap[key] = { domain: key, label, tabs: [] };
+          }
+          groupMap[key].tabs.push(tab);
+        } catch {}
+        continue;
+      }
+      // Handle chrome-extension:// pages
+      if (tab.url && tab.url.startsWith("chrome-extension://")) {
+        try {
+          const extId = new URL(tab.url).hostname;
+          const key = "chrome-extension://" + extId;
+          if (!groupMap[key]) {
+            const label = tab.isTabOut
+              ? "Browser Organizer"
+              : tab.title || "Extension";
+            groupMap[key] = { domain: key, label, tabs: [] };
+          }
+          groupMap[key].tabs.push(tab);
+        } catch {}
+        continue;
+      }
       try {
         if (isLandingPage(tab.url)) {
           landing.push(tab);
@@ -3230,10 +3277,15 @@ async function renderStaticDashboard() {
   }
 
   // Split tabs into pinned + regular and group each subset separately.
+  // displayTabs includes chrome:// and extension pages for the full picture;
+  // realTabs (filtered) is still used for close-all count and smart cleanup.
+  const displayTabs = getDisplayTabs();
   const pinnedRealTabs = realTabs.filter((t) => t.pinned);
   const regularRealTabs = realTabs.filter((t) => !t.pinned);
-  pinnedDomainGroups = groupTabsByDomain(pinnedRealTabs);
-  domainGroups = groupTabsByDomain(regularRealTabs);
+  const pinnedDisplayTabs = displayTabs.filter((t) => t.pinned);
+  const regularDisplayTabs = displayTabs.filter((t) => !t.pinned);
+  pinnedDomainGroups = groupTabsByDomain(pinnedDisplayTabs);
+  domainGroups = groupTabsByDomain(regularDisplayTabs);
   renderSmartCleanup(realTabs);
   renderDailyPlanner();
 
