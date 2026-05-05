@@ -359,7 +359,22 @@
           <!-- Regular open-tabs sub-section. -->
           <div class="active-subsection" id="openTabsSubSection">
             <div class="section-header compact-section-header">
-              <h2>By domain</h2>
+              <div class="view-toggle" id="tabViewToggle">
+                <button
+                  class="view-toggle-btn is-active"
+                  data-action="switch-tab-view"
+                  data-view="domain"
+                >
+                  Domain
+                </button>
+                <button
+                  class="view-toggle-btn"
+                  data-action="switch-tab-view"
+                  data-view="status"
+                >
+                  Status
+                </button>
+              </div>
               <div class="section-line"></div>
               <!-- "Close all N tabs" lives at the right edge of the header -->
               <div class="section-action" id="openTabsSectionAction"></div>
@@ -373,6 +388,26 @@
               <strong id="statTabs">—</strong>
               <span>open tabs tracked locally</span>
             </div>
+          </div>
+
+          <!-- Saved Sessions -->
+          <div
+            class="saved-sessions-panel"
+            id="savedSessionsPanel"
+            style="display: none"
+          >
+            <div class="section-header compact-section-header">
+              <h2>Saved Sessions</h2>
+              <div class="section-line"></div>
+              <button
+                class="action-btn"
+                data-action="save-current-session"
+                title="Save all open tabs as a session"
+              >
+                + Save
+              </button>
+            </div>
+            <div id="savedSessionsList"></div>
           </div>
 
           <section

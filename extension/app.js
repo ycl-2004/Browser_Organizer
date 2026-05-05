@@ -49,7 +49,7 @@ const STRINGS = {
     titleLabel: "Title",
     titlePlaceholder: "Title (optional)",
     favoritesEmpty:
-      "Nothing pinned yet. Click + to add a URL, or star a tab on the right.",
+      "No favorites yet. Hit + to pin a site, or star any tab on the right.",
     addAFavorite: "Add a favorite",
     addSection: "Section",
     sectionLabel: "Section",
@@ -89,19 +89,19 @@ const STRINGS = {
     allTabsClosed: "All tabs closed. Fresh start.",
     closedExtras: "Closed duplicate Browser Organizer tabs",
     closedDupes: "Closed duplicate tabs",
-    noDupes: "No duplicate tabs found",
+    noDupes: "All clean — no duplicates",
     reviewDupes: "Review Duplicates",
     nDuplicateTabsFound: (n) => `${n} duplicate tab${n !== 1 ? "s" : ""} found`,
-    cleanupHint: "Save memory and reduce clutter",
+    cleanupHint: "You're running lean",
     todoPlaceholder: "Add a new task...",
-    todoEmpty: "No tasks yet. Add one small next step.",
+    todoEmpty: "Nothing here yet. What's your next move?",
     todoAdded: "Task added",
     todoDone: "Task completed",
     plannerEyebrow: "Daily planner",
     plannerToday: "Today",
     plannerSelectedDay: "Selected day",
     plannerDayTasks: (n) => `${n} task${n !== 1 ? "s" : ""}`,
-    plannerNoTasks: "No tasks planned for this day.",
+    plannerNoTasks: "A blank canvas. Plan something great.",
     plannerAddForDay: "Add task for selected day...",
     plannerRangeError: "You can only plan within the next 365 days.",
     profileUpdated: "Profile image updated",
@@ -124,8 +124,8 @@ const STRINGS = {
     profileCollapseAll: "Collapse all",
     profileExpandAll: "Expand all",
     profileLibraryManagerTitle: "Open Chrome Bookmark Manager",
-    profileBookmarksEmpty: "No Chrome profile bookmarks found.",
-    profileReadingEmpty: "No Reading List items.",
+    profileBookmarksEmpty: "No bookmarks in this profile yet.",
+    profileReadingEmpty: "Reading list is empty — find something inspiring.",
     profileBookmarksUnavailable: "Allow the bookmarks permission, then reload.",
     profileReadingUnavailable:
       "Reading List is not available in this Chrome version.",
@@ -138,8 +138,8 @@ const STRINGS = {
       `Closed ${n} tab${n !== 1 ? "s" : ""} from ${name}`,
     tabs: "tabs",
     langToggle: "中",
-    emptyStateTitle: "Inbox zero, but for tabs.",
-    emptyStateSubtitle: "You're free.",
+    emptyStateTitle: "Zero tabs. Total clarity.",
+    emptyStateSubtitle: "Nothing open, nothing pending.",
     unsafeUrl: "URL not allowed (unsafe scheme).",
     importTooBig: "File is too large to import.",
   },
@@ -195,10 +195,10 @@ const STRINGS = {
     allTabsClosed: "所有标签已关闭。重新开始。",
     closedExtras: "已关闭重复的 Browser Organizer",
     closedDupes: "已关闭重复的标签页",
-    noDupes: "没有发现重复标签",
+    noDupes: "干干净净，没有重复",
     reviewDupes: "查看重复",
     nDuplicateTabsFound: (n) => `发现 ${n} 个重复标签`,
-    cleanupHint: "减少占用，让页面更清爽",
+    cleanupHint: "轻装上阵",
     todoPlaceholder: "添加一个新任务...",
     todoEmpty: "还没有任务。先写下一件小事。",
     todoAdded: "任务已添加",
@@ -207,7 +207,7 @@ const STRINGS = {
     plannerToday: "今天",
     plannerSelectedDay: "已选日期",
     plannerDayTasks: (n) => `${n} 个任务`,
-    plannerNoTasks: "这一天还没有安排任务。",
+    plannerNoTasks: "空白画布，计划点什么吧。",
     plannerAddForDay: "为选中日期添加任务...",
     plannerRangeError: "只能计划从今天起 365 天内的任务。",
     profileUpdated: "头像已更新",
@@ -229,8 +229,8 @@ const STRINGS = {
     profileCollapseAll: "全部收起",
     profileExpandAll: "全部展开",
     profileLibraryManagerTitle: "打开 Chrome 书签管理器",
-    profileBookmarksEmpty: "没有找到这个 Chrome profile 的书签。",
-    profileReadingEmpty: "阅读清单为空。",
+    profileBookmarksEmpty: "这个 Profile 还没有书签。",
+    profileReadingEmpty: "阅读清单为空 — 去发现有趣的内容。",
     profileBookmarksUnavailable: "允许 bookmarks 权限后重新加载。",
     profileReadingUnavailable: "这个 Chrome 版本没有开放 Reading List。",
     profileMoreItems: (n) => `Chrome 里还有 ${n} 项`,
@@ -498,6 +498,13 @@ function applyStaticI18n() {
 
 // All open tabs — populated by fetchOpenTabs()
 let openTabs = [];
+
+// Per-URL status labels — populated by loadTabStatuses()
+// Values: "later" | "important" | undefined
+let tabStatuses = {};
+async function loadTabStatuses() {
+  tabStatuses = await TabHomeStorage.getTabStatuses();
+}
 
 /**
  * fetchOpenTabs()
@@ -2636,6 +2643,7 @@ const ICONS = {
 let domainGroups = []; // regular open-tabs groups
 let pinnedDomainGroups = []; // pinned-tabs groups (rendered above)
 const collapsedDomainCards = new Set();
+let currentTabView = "domain"; // "domain" | "status"
 
 /* ----------------------------------------------------------------
    HELPER: filter out browser-internal pages
@@ -2727,6 +2735,9 @@ function buildOverflowChips(
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
       <span class="chip-text">${safeTitle}</span>${dupeTag}
       <div class="chip-actions">
+        <button class="chip-action chip-task" data-action="add-tab-to-task" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to tasks">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75"/></svg>
+        </button>
         <button class="chip-action chip-star${isFav ? " active" : ""}" data-action="favorite-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="${isFav ? t("removeFromFav") : t("addToFav")}">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
         </button>
@@ -2804,11 +2815,24 @@ function renderDomainCard(group, favoritedUrls = new Set()) {
         const chipClass = count > 1 ? " chip-has-dupes" : "";
         const isFav = favoritedUrls.has(tab.url);
         const isPinned = !!tab.pinned;
+        const status = tabStatuses[tab.url] || "";
+        const statusPill = status
+          ? `<span class="chip-status-pill chip-status-${status}">${status === "later" ? "Later" : "Important"}</span>`
+          : "";
         const faviconUrl = getFaviconUrl(tab.url, 32);
-        return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
+        return `<div class="page-chip clickable${chipClass}${status ? ` chip-${status}` : ""}" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
-      <span class="chip-text">${safeTitle}</span>${dupeTag}
+      <span class="chip-text">${safeTitle}</span>${statusPill}${dupeTag}
       <div class="chip-actions">
+        <button class="chip-action chip-later${status === "later" ? " active" : ""}" data-action="mark-tab-later" data-tab-url="${safeUrl}" title="Later">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        </button>
+        <button class="chip-action chip-important${status === "important" ? " active" : ""}" data-action="mark-tab-important" data-tab-url="${safeUrl}" title="Important">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5"/></svg>
+        </button>
+        <button class="chip-action chip-task" data-action="add-tab-to-task" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to tasks">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75"/></svg>
+        </button>
         <button class="chip-action chip-star${isFav ? " active" : ""}" data-action="favorite-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="${isFav ? t("removeFromFav") : t("addToFav")}">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
         </button>
@@ -2833,7 +2857,7 @@ function renderDomainCard(group, favoritedUrls = new Set()) {
     </button>`;
 
   return `
-    <div class="mission-card domain-card ${hasDupes ? "has-amber-bar" : "has-neutral-bar"}${isCollapsed ? " is-collapsed" : ""}" data-domain-id="${stableId}">
+    <div class="mission-card domain-card ${tabs.some((t) => t.active) ? "has-active-bar" : hasDupes ? "has-amber-bar" : "has-neutral-bar"}${isCollapsed ? " is-collapsed" : ""}" data-domain-id="${stableId}">
       <div class="status-bar"></div>
       <div class="mission-content">
         <div class="mission-top">
@@ -3172,8 +3196,141 @@ function renderSmartCleanup(tabs) {
 }
 
 /* ----------------------------------------------------------------
+   SAVED SESSIONS
+   ---------------------------------------------------------------- */
+let savedSessions = [];
+
+async function loadSavedSessions() {
+  savedSessions = await TabHomeStorage.getSavedSessions();
+}
+
+async function persistSessions() {
+  await TabHomeStorage.setSavedSessions(savedSessions);
+}
+
+function renderSavedSessions() {
+  const panel = document.getElementById("savedSessionsPanel");
+  const list = document.getElementById("savedSessionsList");
+  if (!panel || !list) return;
+
+  panel.style.display = "block";
+  if (savedSessions.length === 0) {
+    list.innerHTML = `<div class="session-empty">No saved sessions yet.</div>`;
+    return;
+  }
+  list.innerHTML = savedSessions
+    .map((s) => {
+      const dateStr = new Date(s.createdAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `<div class="session-row" data-session-id="${escapeHtml(s.id)}">
+      <div class="session-info">
+        <span class="session-name">${escapeHtml(s.name)}</span>
+        <span class="session-meta">${s.tabs.length} tabs &middot; ${dateStr}</span>
+      </div>
+      <div class="session-actions">
+        <button class="action-btn" data-action="restore-session" data-session-id="${escapeHtml(s.id)}" title="Restore">Open</button>
+        <button class="action-btn close-tabs" data-action="delete-session" data-session-id="${escapeHtml(s.id)}" title="Delete">${ICONS.close}</button>
+      </div>
+    </div>`;
+    })
+    .join("");
+}
+
+async function saveCurrentSession() {
+  const realTabs = getRealTabs().filter((t) => !t.pinned);
+  if (realTabs.length === 0) return;
+  const name = `Session (${realTabs.length} tabs)`;
+  const session = {
+    id: makeId("sess"),
+    name,
+    createdAt: new Date().toISOString(),
+    tabs: realTabs.map((t) => ({ url: t.url, title: t.title })),
+  };
+  savedSessions.unshift(session);
+  await persistSessions();
+  renderSavedSessions();
+  showToast(`Session saved — ${realTabs.length} tabs`);
+}
+
+async function restoreSession(id) {
+  const session = savedSessions.find((s) => s.id === id);
+  if (!session) return;
+  for (const tab of session.tabs) {
+    try {
+      await chrome.tabs.create({ url: tab.url, active: false });
+    } catch {}
+  }
+  showToast(`Restored ${session.tabs.length} tabs`);
+}
+
+async function deleteSession(id) {
+  savedSessions = savedSessions.filter((s) => s.id !== id);
+  await persistSessions();
+  renderSavedSessions();
+}
+
+/* ----------------------------------------------------------------
    MAIN DASHBOARD RENDERER
    ---------------------------------------------------------------- */
+
+/**
+ * renderStatusView(tabs, favoritedUrls)
+ *
+ * Renders open tabs grouped by status: Important → Later → Active (no status).
+ */
+function renderStatusView(tabs, favoritedUrls) {
+  const groups = { important: [], later: [], active: [] };
+  for (const tab of tabs) {
+    const status = tabStatuses[tab.url];
+    if (status === "important") groups.important.push(tab);
+    else if (status === "later") groups.later.push(tab);
+    else groups.active.push(tab);
+  }
+
+  const LABELS = { important: "Important", later: "Later", active: "Active" };
+
+  let html = "";
+  for (const key of ["important", "later", "active"]) {
+    const list = groups[key];
+    if (!list.length) continue;
+    const chips = list
+      .map((tab) => {
+        const label = cleanTitle(
+          smartTitle(stripTitleNoise(tab.title || ""), tab.url),
+          "",
+        );
+        const safeUrl = escapeHtml(tab.url || "");
+        const safeTitle = escapeHtml(label);
+        const isFav = favoritedUrls.has(tab.url);
+        const faviconUrl = getFaviconUrl(tab.url, 32);
+        return `<div class="page-chip clickable" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
+        ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
+        <span class="chip-text">${safeTitle}</span>
+        <div class="chip-actions">
+          <button class="chip-action chip-task" data-action="add-tab-to-task" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Add to tasks">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75"/></svg>
+          </button>
+          <button class="chip-action chip-star${isFav ? " active" : ""}" data-action="favorite-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="${isFav ? t("removeFromFav") : t("addToFav")}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
+          </button>
+          <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${t("closeThisTab")}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      </div>`;
+      })
+      .join("");
+    html += `<div class="status-group-card">
+      <div class="status-group-header"><span class="status-dot status-dot-${key}"></span>${LABELS[key]} (${list.length})</div>
+      <div class="mission-pages">${chips}</div>
+    </div>`;
+  }
+  return html;
+}
 
 /**
  * renderStaticDashboard()
@@ -3419,19 +3576,26 @@ async function renderStaticDashboard() {
   // expand to swallow the whole page.
   if (openTabsSection) openTabsSection.style.display = "block";
 
-  if (domainGroups.length > 0 && openTabsSubSection) {
-    if (openTabsSectionTitle) openTabsSectionTitle.textContent = t("openTabs");
+  if (openTabsSectionTitle) openTabsSectionTitle.textContent = t("openTabs");
+
+  if (regularDisplayTabs.length > 0 && openTabsSubSection) {
     openTabsSectionCount.innerHTML = t("nDomains", domainGroups.length);
     if (openTabsSectionAction) {
       openTabsSectionAction.innerHTML = `<button class="action-btn close-tabs" data-action="close-all-open-tabs">${ICONS.close} ${t("closeAllN", regularRealTabs.length)}</button>`;
     }
-    openTabsMissionsEl.innerHTML = domainGroups
-      .map((g) => renderDomainCard(g, favoritedUrls))
-      .join("");
+    if (currentTabView === "status") {
+      openTabsMissionsEl.innerHTML = renderStatusView(
+        regularDisplayTabs,
+        favoritedUrls,
+      );
+    } else {
+      openTabsMissionsEl.innerHTML = domainGroups
+        .map((g) => renderDomainCard(g, favoritedUrls))
+        .join("");
+    }
     openTabsSubSection.style.display = "block";
   } else if (openTabsSubSection) {
     openTabsSubSection.style.display = "none";
-    if (openTabsSectionTitle) openTabsSectionTitle.textContent = t("openTabs");
     if (openTabsSectionCount)
       openTabsSectionCount.textContent = t("nDomains", 0);
     if (openTabsSectionAction) openTabsSectionAction.innerHTML = "";
@@ -3815,6 +3979,36 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  // ---- Sessions: save / restore / delete ----
+  if (action === "save-current-session") {
+    await saveCurrentSession();
+    return;
+  }
+  if (action === "restore-session") {
+    const sessionId = actionEl.dataset.sessionId;
+    if (sessionId) await restoreSession(sessionId);
+    return;
+  }
+  if (action === "delete-session") {
+    const sessionId = actionEl.dataset.sessionId;
+    if (sessionId) await deleteSession(sessionId);
+    return;
+  }
+
+  // ---- Switch tab view: Domain / Status ----
+  if (action === "switch-tab-view") {
+    const view = actionEl.dataset.view;
+    if (!view || view === currentTabView) return;
+    currentTabView = view;
+    document
+      .querySelectorAll("#tabViewToggle .view-toggle-btn")
+      .forEach((btn) => {
+        btn.classList.toggle("is-active", btn.dataset.view === view);
+      });
+    await renderDashboard();
+    return;
+  }
+
   const card = actionEl.closest(".mission-card");
 
   if (action === "toggle-domain-card") {
@@ -3917,6 +4111,35 @@ document.addEventListener("click", async (e) => {
     if (statTabs) statTabs.textContent = openTabs.length;
 
     showToast(t("tabClosed"));
+    return;
+  }
+
+  // ---- Add tab as a Daily Planner task ----
+  if (action === "add-tab-to-task") {
+    e.stopPropagation();
+    const title = actionEl.dataset.tabTitle;
+    const url = actionEl.dataset.tabUrl;
+    if (!title && !url) return;
+    const taskTitle = title || url;
+    const todayKey = toLocalDateKey(new Date());
+    const added = await addDailyTask(taskTitle, "Web", todayKey);
+    if (added) showToast(t("todoAdded"));
+    return;
+  }
+
+  // ---- Mark tab as Later / Important (toggle) ----
+  if (action === "mark-tab-later" || action === "mark-tab-important") {
+    e.stopPropagation();
+    const url = actionEl.dataset.tabUrl;
+    if (!url) return;
+    const key = action === "mark-tab-later" ? "later" : "important";
+    if (tabStatuses[url] === key) {
+      delete tabStatuses[url];
+    } else {
+      tabStatuses[url] = key;
+    }
+    await TabHomeStorage.setTabStatuses(tabStatuses);
+    await renderDashboard();
     return;
   }
 
@@ -4945,7 +5168,10 @@ if (chrome.bookmarks) {
     }, msToNextMinute);
   })();
   loadAndPaintWeather();
+  await loadTabStatuses();
+  await loadSavedSessions();
   await renderDashboard();
+  renderSavedSessions();
   await loadBookmarkUiState();
   await renderProfileLibrary();
 })();

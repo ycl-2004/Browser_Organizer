@@ -19,6 +19,8 @@
     dailyTasks: "dailyTasks",
     lang: "lang",
     theme: "theme",
+    tabStatuses: "tabStatuses",
+    savedSessions: "savedSessions",
   };
 
   const META_KEYS = {
@@ -262,6 +264,28 @@
     }
   }
 
+  async function getSavedSessions() {
+    const data = await chrome.storage.local.get(LOCAL_KEYS.savedSessions);
+    return data[LOCAL_KEYS.savedSessions] || [];
+  }
+
+  async function setSavedSessions(sessions) {
+    await chrome.storage.local.set({
+      [LOCAL_KEYS.savedSessions]: sessions || [],
+    });
+  }
+
+  async function getTabStatuses() {
+    const data = await chrome.storage.local.get(LOCAL_KEYS.tabStatuses);
+    return data[LOCAL_KEYS.tabStatuses] || {};
+  }
+
+  async function setTabStatuses(statuses) {
+    await chrome.storage.local.set({
+      [LOCAL_KEYS.tabStatuses]: statuses || {},
+    });
+  }
+
   root.TabHomeStorage = Object.freeze({
     LOCAL_KEYS,
     META_KEYS,
@@ -270,11 +294,15 @@
     getFavorites,
     getFavoriteSections,
     getLang,
+    getSavedSessions,
+    getTabStatuses,
     getTheme,
     setDailyTasks,
     setFavorites,
     setFavoriteSections,
     setLang,
+    setSavedSessions,
+    setTabStatuses,
     setTheme,
   });
 })(typeof self !== "undefined" ? self : window);
