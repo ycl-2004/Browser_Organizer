@@ -870,13 +870,6 @@ header {
   border: 1px solid color-mix(in srgb, var(--status-abandoned) 20%, transparent);
 }
 
-.page-chip.chip-later {
-  border-left: 2px solid var(--status-cooling);
-}
-.page-chip.chip-important {
-  border-left: 2px solid var(--status-abandoned);
-}
-
 .page-chip.clickable {
   cursor: pointer;
   transition: background 0.15s ease;
@@ -2496,6 +2489,15 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 /* ---- Saved Sessions panel ---- */
 .saved-sessions-panel {
   padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#savedSessionsList {
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .session-empty {
@@ -2504,15 +2506,63 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   padding: 8px 0;
 }
 
+.session-card {
+  background: var(--card-bg);
+  border: 1px solid var(--warm-gray);
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
 .session-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  background: var(--card-bg);
-  border: 1px solid var(--warm-gray);
-  margin-bottom: 6px;
   gap: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.session-row:hover {
+  background: var(--hover-bg);
+}
+
+.session-preview {
+  border-top: 1px solid var(--warm-gray);
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.session-tab-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.session-tab-row:hover {
+  background: var(--hover-bg);
+}
+
+.session-tab-favicon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.session-tab-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .session-info {
@@ -2529,6 +2579,26 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+}
+
+.session-name:hover {
+  border-bottom-color: var(--muted);
+}
+
+.session-rename-input {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--hover-bg);
+  border: 1px solid var(--accent-amber);
+  border-radius: 3px;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
 }
 
 .session-meta {
@@ -2545,6 +2615,95 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 .session-actions .action-btn {
   font-size: 11px;
   padding: 3px 8px;
+}
+
+/* ---- Batch mode ---- */
+.batch-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--card-bg);
+  border-top: 1px solid var(--warm-gray);
+  box-shadow: 0 -2px 12px var(--shadow);
+}
+
+.batch-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.batch-action-btn {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border: 1px solid var(--warm-gray);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.batch-action-btn:hover {
+  background: var(--hover-bg);
+  border-color: var(--accent-amber);
+}
+
+.batch-action-btn.batch-close {
+  color: var(--status-abandoned);
+  border-color: color-mix(in srgb, var(--status-abandoned) 30%, transparent);
+}
+
+.batch-action-btn.batch-close:hover {
+  background: color-mix(in srgb, var(--status-abandoned) 8%, transparent);
+}
+
+/* Checkbox shown on chips in batch mode */
+.batch-check {
+  display: none;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  accent-color: var(--accent-amber);
+  cursor: pointer;
+}
+
+.batch-mode .batch-check {
+  display: inline-block;
+}
+
+.batch-mode .page-chip {
+  cursor: pointer;
+}
+
+.batch-mode .page-chip.is-batch-selected {
+  background: color-mix(in srgb, var(--accent-amber) 8%, transparent);
+  border-color: var(--accent-amber);
+}
+
+/* Hide per-chip action buttons in batch mode to reduce clutter */
+.batch-mode .chip-actions {
+  display: none;
+}
+
+#batchModeBtn.is-active {
+  background: color-mix(in srgb, var(--accent-amber) 12%, transparent);
+  color: var(--accent-amber);
 }
 
 .tabs-column .missions {

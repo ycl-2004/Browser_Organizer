@@ -375,11 +375,43 @@
                   Status
                 </button>
               </div>
+              <button
+                class="view-toggle-btn"
+                data-action="toggle-batch-mode"
+                id="batchModeBtn"
+              >
+                Select
+              </button>
               <div class="section-line"></div>
               <!-- "Close all N tabs" lives at the right edge of the header -->
               <div class="section-action" id="openTabsSectionAction"></div>
             </div>
             <div class="missions" id="openTabsMissions"></div>
+          </div>
+
+          <!-- Floating batch action bar -->
+          <div class="batch-bar" id="batchBar" style="display: none">
+            <span class="batch-count" id="batchCount">0 selected</span>
+            <div class="batch-actions">
+              <button class="batch-action-btn" data-action="batch-mark-later">
+                Later
+              </button>
+              <button
+                class="batch-action-btn"
+                data-action="batch-mark-important"
+              >
+                Important
+              </button>
+              <button class="batch-action-btn" data-action="batch-add-tasks">
+                + Tasks
+              </button>
+              <button
+                class="batch-action-btn batch-close"
+                data-action="batch-close-tabs"
+              >
+                Close
+              </button>
+            </div>
           </div>
 
           <div class="smart-cleanup-card" id="smartCleanupCard">
@@ -391,71 +423,21 @@
           </div>
 
           <!-- Saved Sessions -->
-          <div
-            class="saved-sessions-panel"
-            id="savedSessionsPanel"
-            style="display: none"
-          >
+          <div class="saved-sessions-panel" id="savedSessionsPanel">
             <div class="section-header compact-section-header">
               <h2>Saved Sessions</h2>
               <div class="section-line"></div>
               <button
                 class="action-btn"
                 data-action="save-current-session"
+                id="saveSessionBtn"
                 title="Save all open tabs as a session"
               >
-                + Save
+                + Save All
               </button>
             </div>
             <div id="savedSessionsList"></div>
           </div>
-
-          <section
-            class="profile-library dashboard-panel"
-            id="profileLibraryPanel"
-          >
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow" id="profileLibraryEyebrow">Chrome profile</p>
-                <h2 id="profileLibraryTitle">Bookmarks & Lists</h2>
-              </div>
-              <div class="profile-library-actions">
-                <button
-                  class="profile-library-manager"
-                  type="button"
-                  data-action="collapse-bookmarks"
-                  id="profileLibraryCollapse"
-                >
-                  Collapse all
-                </button>
-                <button
-                  class="profile-library-manager"
-                  type="button"
-                  data-action="expand-bookmarks"
-                  id="profileLibraryExpand"
-                >
-                  Expand all
-                </button>
-                <button
-                  class="profile-library-more"
-                  type="button"
-                  data-action="open-bookmark-manager"
-                  id="profileLibraryManager"
-                  title="Open Chrome Bookmark Manager"
-                >
-                  ⋮
-                </button>
-              </div>
-            </div>
-
-            <div class="profile-library-section">
-              <div class="profile-library-subhead">
-                <span id="profileBookmarksTitle">Bookmarks</span>
-                <small id="profileBookmarksCount">0</small>
-              </div>
-              <div class="profile-link-list" id="profileBookmarksList"></div>
-            </div>
-          </section>
         </aside>
       </main>
       <!-- end .dashboard-grid -->

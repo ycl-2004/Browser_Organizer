@@ -2644,6 +2644,59 @@ let domainGroups = []; // regular open-tabs groups
 let pinnedDomainGroups = []; // pinned-tabs groups (rendered above)
 const collapsedDomainCards = new Set();
 let currentTabView = "domain"; // "domain" | "status"
+let batchMode = false;
+const batchSelected = new Map(); // url → tabId
+
+function updateBatchBar() {
+  const bar = document.getElementById("batchBar");
+  const countEl = document.getElementById("batchCount");
+  if (!bar) return;
+  if (!batchMode || batchSelected.size === 0) {
+    bar.style.display = "none";
+  } else {
+    bar.style.display = "flex";
+    if (countEl) countEl.textContent = `${batchSelected.size} selected`;
+  }
+  updateSaveSessionBtn();
+}
+
+function updateSaveSessionBtn() {
+  const btn = document.getElementById("saveSessionBtn");
+  if (!btn) return;
+  if (batchMode && batchSelected.size > 0) {
+    btn.textContent = `+ Save ${batchSelected.size} tabs`;
+    btn.title = `Save ${batchSelected.size} selected tabs as a session`;
+  } else {
+    const count = getRealTabs().filter((t) => !t.pinned).length;
+    btn.textContent = `+ Save All`;
+    btn.title = `Save all ${count} open tabs as a session`;
+  }
+}
+
+function exitBatchMode() {
+  batchMode = false;
+  batchSelected.clear();
+  const section = document.getElementById("openTabsSection");
+  if (section) section.classList.remove("batch-mode");
+  const btn = document.getElementById("batchModeBtn");
+  if (btn) {
+    btn.classList.remove("is-active");
+    btn.textContent = "Select";
+  }
+  updateBatchBar();
+}
+
+function enterBatchMode() {
+  batchMode = true;
+  const section = document.getElementById("openTabsSection");
+  if (section) section.classList.add("batch-mode");
+  const btn = document.getElementById("batchModeBtn");
+  if (btn) {
+    btn.classList.add("is-active");
+    btn.textContent = "Done";
+  }
+  updateBatchBar();
+}
 
 /* ----------------------------------------------------------------
    HELPER: filter out browser-internal pages
@@ -2732,6 +2785,7 @@ function buildOverflowChips(
       const isPinned = !!tab.pinned;
       const faviconUrl = getFaviconUrl(tab.url, 32);
       return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
+      <input class="batch-check" type="checkbox" data-action="batch-select-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
       <span class="chip-text">${safeTitle}</span>${dupeTag}
       <div class="chip-actions">
@@ -2821,6 +2875,7 @@ function renderDomainCard(group, favoritedUrls = new Set()) {
           : "";
         const faviconUrl = getFaviconUrl(tab.url, 32);
         return `<div class="page-chip clickable${chipClass}${status ? ` chip-${status}` : ""}" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
+      <input class="batch-check" type="checkbox" data-action="batch-select-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
       <span class="chip-text">${safeTitle}</span>${statusPill}${dupeTag}
       <div class="chip-actions">
@@ -3213,7 +3268,6 @@ function renderSavedSessions() {
   const list = document.getElementById("savedSessionsList");
   if (!panel || !list) return;
 
-  panel.style.display = "block";
   if (savedSessions.length === 0) {
     list.innerHTML = `<div class="session-empty">No saved sessions yet.</div>`;
     return;
@@ -3226,34 +3280,55 @@ function renderSavedSessions() {
         hour: "2-digit",
         minute: "2-digit",
       });
-      return `<div class="session-row" data-session-id="${escapeHtml(s.id)}">
-      <div class="session-info">
-        <span class="session-name">${escapeHtml(s.name)}</span>
-        <span class="session-meta">${s.tabs.length} tabs &middot; ${dateStr}</span>
+      const tabPreview = s.tabs
+        .map((tab) => {
+          const faviconUrl = getFaviconUrl(tab.url, 16);
+          const title = escapeHtml(tab.title || tab.url);
+          const url = escapeHtml(tab.url);
+          return `<div class="session-tab-row" title="${url}">
+          ${faviconUrl ? `<img class="session-tab-favicon" src="${faviconUrl}" alt="">` : `<span class="session-tab-favicon"></span>`}
+          <span class="session-tab-title">${title}</span>
+        </div>`;
+        })
+        .join("");
+      return `<div class="session-card" data-session-id="${escapeHtml(s.id)}">
+      <div class="session-row" data-action="toggle-session-preview" data-session-id="${escapeHtml(s.id)}">
+        <div class="session-info">
+          <span class="session-name" data-action="rename-session" data-session-id="${escapeHtml(s.id)}" title="Click to rename">${escapeHtml(s.name)}</span>
+          <span class="session-meta">${s.tabs.length} tabs &middot; ${dateStr}</span>
+        </div>
+        <div class="session-actions">
+          <button class="action-btn" data-action="restore-session" data-session-id="${escapeHtml(s.id)}" title="Restore all tabs">Open</button>
+          <button class="action-btn close-tabs" data-action="delete-session" data-session-id="${escapeHtml(s.id)}" title="Delete session">${ICONS.close}</button>
+        </div>
       </div>
-      <div class="session-actions">
-        <button class="action-btn" data-action="restore-session" data-session-id="${escapeHtml(s.id)}" title="Restore">Open</button>
-        <button class="action-btn close-tabs" data-action="delete-session" data-session-id="${escapeHtml(s.id)}" title="Delete">${ICONS.close}</button>
-      </div>
+      <div class="session-preview" style="display:none">${tabPreview}</div>
     </div>`;
     })
     .join("");
 }
 
 async function saveCurrentSession() {
-  const realTabs = getRealTabs().filter((t) => !t.pinned);
-  if (realTabs.length === 0) return;
-  const name = `Session (${realTabs.length} tabs)`;
+  let tabsToSave;
+  if (batchMode && batchSelected.size > 0) {
+    const selectedUrls = new Set(batchSelected.keys());
+    tabsToSave = openTabs.filter((t) => selectedUrls.has(t.url));
+  } else {
+    tabsToSave = getRealTabs().filter((t) => !t.pinned);
+  }
+  if (tabsToSave.length === 0) return;
+  const name = `Session (${tabsToSave.length} tabs)`;
   const session = {
     id: makeId("sess"),
     name,
     createdAt: new Date().toISOString(),
-    tabs: realTabs.map((t) => ({ url: t.url, title: t.title })),
+    tabs: tabsToSave.map((t) => ({ url: t.url, title: t.title })),
   };
   savedSessions.unshift(session);
   await persistSessions();
   renderSavedSessions();
-  showToast(`Session saved — ${realTabs.length} tabs`);
+  if (batchMode) exitBatchMode();
+  showToast(`Session saved — ${tabsToSave.length} tabs`);
 }
 
 async function restoreSession(id) {
@@ -3308,6 +3383,7 @@ function renderStatusView(tabs, favoritedUrls) {
         const isFav = favoritedUrls.has(tab.url);
         const faviconUrl = getFaviconUrl(tab.url, 32);
         return `<div class="page-chip clickable" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
+        <input class="batch-check" type="checkbox" data-action="batch-select-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}">
         ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
         <span class="chip-text">${safeTitle}</span>
         <div class="chip-actions">
@@ -3979,6 +4055,78 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  // ---- Batch mode ----
+  if (action === "toggle-batch-mode") {
+    if (batchMode) exitBatchMode();
+    else enterBatchMode();
+    return;
+  }
+
+  if (action === "batch-select-tab") {
+    e.stopPropagation();
+    const url = actionEl.dataset.tabUrl;
+    const tabId = parseInt(actionEl.dataset.tabId, 10);
+    if (!url) return;
+    const chip = actionEl.closest(".page-chip");
+    if (batchSelected.has(url)) {
+      batchSelected.delete(url);
+      if (chip) chip.classList.remove("is-batch-selected");
+      actionEl.checked = false;
+    } else {
+      batchSelected.set(url, tabId);
+      if (chip) chip.classList.add("is-batch-selected");
+      actionEl.checked = true;
+    }
+    updateBatchBar();
+    return;
+  }
+
+  if (action === "batch-close-tabs") {
+    if (batchSelected.size === 0) return;
+    const ids = [...batchSelected.values()].filter((id) => !Number.isNaN(id));
+    if (ids.length > 0) {
+      try {
+        await chrome.tabs.remove(ids);
+      } catch {}
+    }
+    const n = batchSelected.size;
+    exitBatchMode();
+    await fetchOpenTabs();
+    await renderDashboard();
+    showToast(`Closed ${n} tabs`);
+    return;
+  }
+
+  if (action === "batch-mark-later") {
+    for (const url of batchSelected.keys()) tabStatuses[url] = "later";
+    await TabHomeStorage.setTabStatuses(tabStatuses);
+    exitBatchMode();
+    await renderDashboard();
+    return;
+  }
+
+  if (action === "batch-mark-important") {
+    for (const url of batchSelected.keys()) tabStatuses[url] = "important";
+    await TabHomeStorage.setTabStatuses(tabStatuses);
+    exitBatchMode();
+    await renderDashboard();
+    return;
+  }
+
+  if (action === "batch-add-tasks") {
+    const todayKey = toLocalDateKey(new Date());
+    let count = 0;
+    for (const [url] of batchSelected) {
+      const tab = openTabs.find((t) => t.url === url);
+      const title = tab ? tab.title || url : url;
+      const added = await addDailyTask(title, "Web", todayKey);
+      if (added) count++;
+    }
+    exitBatchMode();
+    if (count > 0) showToast(`Added ${count} tasks`);
+    return;
+  }
+
   // ---- Sessions: save / restore / delete ----
   if (action === "save-current-session") {
     await saveCurrentSession();
@@ -3992,6 +4140,47 @@ document.addEventListener("click", async (e) => {
   if (action === "delete-session") {
     const sessionId = actionEl.dataset.sessionId;
     if (sessionId) await deleteSession(sessionId);
+    return;
+  }
+  if (action === "toggle-session-preview") {
+    const card = actionEl.closest(".session-card");
+    if (!card) return;
+    const preview = card.querySelector(".session-preview");
+    if (preview) {
+      preview.style.display =
+        preview.style.display === "none" ? "block" : "none";
+    }
+    return;
+  }
+  if (action === "rename-session") {
+    const sessionId = actionEl.dataset.sessionId;
+    const session = savedSessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const span = actionEl;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "session-rename-input";
+    input.value = session.name;
+    span.replaceWith(input);
+    input.focus();
+    input.select();
+    const commit = async () => {
+      const newName = input.value.trim() || session.name;
+      session.name = newName;
+      await persistSessions();
+      renderSavedSessions();
+    };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        input.blur();
+      }
+      if (ev.key === "Escape") {
+        input.value = session.name;
+        input.blur();
+      }
+    });
     return;
   }
 
@@ -4047,8 +4236,26 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
-  // ---- Focus a specific tab ----
+  // ---- Focus a specific tab (or toggle selection in batch mode) ----
   if (action === "focus-tab") {
+    if (batchMode) {
+      const url = actionEl.dataset.tabUrl;
+      const tabId = parseInt(actionEl.dataset.tabId, 10);
+      const checkbox = actionEl.querySelector(".batch-check");
+      if (url) {
+        if (batchSelected.has(url)) {
+          batchSelected.delete(url);
+          actionEl.classList.remove("is-batch-selected");
+          if (checkbox) checkbox.checked = false;
+        } else {
+          batchSelected.set(url, tabId);
+          actionEl.classList.add("is-batch-selected");
+          if (checkbox) checkbox.checked = true;
+        }
+        updateBatchBar();
+      }
+      return;
+    }
     const tabId = parseInt(actionEl.dataset.tabId, 10);
     if (!Number.isNaN(tabId)) {
       try {
@@ -5118,26 +5325,9 @@ if (chrome.storage && chrome.storage.onChanged) {
         if (!heroCopy || !heroCopy.isContentEditable) paintHeroCopy();
       }
       if (changes.profileImageDataUrl) paintProfileImage();
-      if (
-        changes.profileBookmarkCollapsedFolders ||
-        changes.profileBookmarkExpandedFolders
-      ) {
-        await loadBookmarkUiState();
-        renderProfileBookmarks();
-      }
       return;
     }
   });
-}
-
-if (chrome.bookmarks) {
-  chrome.bookmarks.onCreated?.addListener(scheduleProfileLibraryRender);
-  chrome.bookmarks.onRemoved?.addListener(scheduleProfileLibraryRender);
-  chrome.bookmarks.onChanged?.addListener(scheduleProfileLibraryRender);
-  chrome.bookmarks.onMoved?.addListener(scheduleProfileLibraryRender);
-  chrome.bookmarks.onChildrenReordered?.addListener(
-    scheduleProfileLibraryRender,
-  );
 }
 
 /* ----------------------------------------------------------------
@@ -5172,6 +5362,5 @@ if (chrome.bookmarks) {
   await loadSavedSessions();
   await renderDashboard();
   renderSavedSessions();
-  await loadBookmarkUiState();
-  await renderProfileLibrary();
+  updateSaveSessionBtn();
 })();
