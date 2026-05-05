@@ -1,165 +1,400 @@
 # Browser Organizer
 
-**让你的新标签页有意义。**
+> A calm, local-first Chrome new tab page that replaces the default blank tab with a personal dashboard.
 
-Browser Organizer 是一个 Chrome 浏览器扩展，把默认的「新标签页」替换成一个干净的个人仪表板：顶部是时钟与快速搜索，左侧是长期收藏，中间是专注工作区与每日规划，右侧是当前打开的所有标签（按域名分组）。
+**Browser Organizer** turns every new tab into a clean workspace: long-term favorites on the left, a focus area with daily planner in the center, and a live view of all your open tabs on the right. Everything runs locally inside Chrome — no server, no account, no data leaves your machine.
 
-无服务器、无账号，所有数据保存在本地 `chrome.storage.local`，不向任何外部服务上传用户数据。需要跨设备或跨 profile 迁移时，可在右上角直接 Export / Import 本地 JSON 文件。Fork 自 [tab-out](https://github.com/zarazhangrui/tab-out) by [Zara](https://x.com/zarazhangrui)。
-
----
-
-## 主要功能
-
-### 收藏区（左侧）
-
-- **无限收藏**，以 section 分组呈现；section 可新增、重命名、上下排序、折叠/展开
-- 旧版收藏自动迁移到 `default` section，保留原始 `favorites` storage key
-- 鼠标悬停 → 右上角出现 ⋯ 菜单，可编辑或删除
-- 自动抓取网站 logo（优先 `apple-touch-icon.png`，兜底 Chrome 缓存的 favicon）
-- **二进制缓存**：图标加载成功后转 base64 存进 `chrome.storage.local`，之后刷新页面零网络请求
-- **自定义 logo**：编辑收藏时可上传图片或直接 `Cmd+V` 粘贴剪贴板里的图片，自动压缩到 256×256
-- **智能命名**：留空标题自动从 URL 提取品牌名（`www.binance.com` → `Binance`，`accounts.binance.com` → `Binance`）
-- **拖拽排序**：在同一 section 内拖拽收藏卡片即可交换位置，也可拖到空位直接放置
-
-### 中间专注区
-
-- Hero 区显示当前时段问候（根据本地时间自动切换 Good morning / Good afternoon / Good night）
-- **Hero 标题与描述文案均可双击编辑**，保存到本地，跟随 JSON Export / Import
-- **Today Task 面板**：显示今天的任务列表，可勾选完成或删除
-- **Daily Planner 日历**：按月展示，点击日期查看/新增该日任务；每格显示任务数量徽章；支持最多 365 天内的计划
-- 每条任务可设置标签（Work / Projects / Personal / Design）
-- **Profile avatar**：支持本地图片上传，图片压缩后存入 `chrome.storage.local`
-- 位置/天气区域为 UI 占位，不请求定位、不调用外部天气 API
-
-### 当前标签区（右侧）
-
-- 按域名自动分组成卡片
-- 每个 domain group 可展开 / 收合
-- **固定标签**单独置顶显示，与普通标签明确分开
-- 每个标签 chip 有三个操作按钮：
-  - ⭐ 加入收藏 / 取消收藏（取消时弹自定义确认框）
-  - 📌 固定 / 取消固定
-  - ✕ 关闭这个标签（带撒花动画 + 音效）
-- 重复标签显示 `重复 x N` 徽章，点击关闭该 URL 的所有多余副本
-- **按最近活跃排序**：你刚切过去的网站所在组排在最顶
-- **Smart cleanup 面板**：统计当前重复标签数，一键定位
-- 实时同步：在浏览器其他位置开/关/切换标签，这里跟着自动刷新（防抖 150ms）
-- 工具栏 badge 实时显示真实网页标签数，颜色按多少分绿/琥珀/红三档
-
-### 右键菜单
-
-- 任意网页右键 → 「Add page to Browser Organizer favorites」收藏当前页
-- 右键链接 → 「Add link to Browser Organizer favorites」收藏该链接
-
-### 顶栏工具
-
-- **Command bar**：输入网址直接跳转，输入搜索词使用 Google 搜索，支持 `localhost:3000` 等格式自动补全协议
-- **New Tab** 按钮：在 Chrome 开一个新标签页
-- **Export / Import**：把收藏、分组、每日任务、Hero 标题与文案、头像、主题导出为 JSON；Import 前弹确认框，不影响正在打开的 tabs 和可重新生成的 favicon cache
-- **重复 Browser Organizer 标签检测**：多开新标签页时显示横幅，一键保留一个关闭其余
-- 🌙 / ☀️ 深色 / 浅色模式切换（右上角，自动记忆）
-
-### Chrome Profile 面板（右侧下方）
-
-- 读取当前 Chrome profile 原生 **Bookmarks**，以树形折叠展示
-- 支持全部折叠 / 全部展开，文件夹内超出 5 条的可按需展开
-- 右上角 ⋮ 按钮直接打开 `chrome://bookmarks`
-- 直接点击收藏 → 在新标签页打开，不替换当前 Browser Organizer 页面
+Forked from [tab-out](https://github.com/zarazhangrui/tab-out) by [Zara](https://x.com/zarazhangrui).
 
 ---
 
-## 安装方式
+## Table of Contents
 
-### 方法 1：让 Coding Agent 帮你装
+- [Features](#features)
+- [Installation](#installation)
+- [Getting Started](#getting-started)
+- [Usage Guide](#usage-guide)
+- [Default Configuration](#default-configuration)
+- [Architecture](#architecture)
+- [Data Schema](#data-schema)
+- [Customization](#customization)
+- [Updating](#updating)
+- [License](#license)
 
-把这个本地项目文件夹发给 Claude Code / Codex / Cursor 等 agent，告诉它「install this」：
+---
+
+## Features
+
+### Favorites (Left Column)
+
+| Feature                 | Description                                                                                                                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Unlimited bookmarks** | Organize into named sections; sections can be created, renamed, reordered, and collapsed                                                                                     |
+| **Auto favicon**        | Fetches `apple-touch-icon.png` first, falls back to Chrome's cached favicon, then binary-caches the icon as base64 in local storage — zero network requests after first load |
+| **Custom logo**         | Upload an image or paste from clipboard (`Cmd+V`); auto-compressed to 256×256                                                                                                |
+| **Smart naming**        | Leave title blank → auto-extracts brand name from URL (`www.notion.so` → `Notion`)                                                                                           |
+| **Drag & drop**         | Reorder cards within a section by dragging                                                                                                                                   |
+| **Hover menu**          | `⋯` button appears on hover → edit or delete                                                                                                                                 |
+| **Right-click to add**  | Right-click any page or link → "Add to Browser Organizer favorites"                                                                                                          |
+
+### Focus Area (Center Column)
+
+| Feature                            | Description                                                                                                                   |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Time-of-day greeting**           | Auto-switches between Good morning / Good afternoon / Good evening / Good night                                               |
+| **Editable hero title & subtitle** | Double-click to edit; persists locally and exports with JSON backup                                                           |
+| **Today Task**                     | Quick-add tasks for today; check off or delete; tag with Work / Projects / Personal / Design / Web                            |
+| **Daily Planner**                  | Month calendar view; click any date to view/add tasks; badge shows task count per day; supports planning up to 365 days ahead |
+| **Profile avatar**                 | Upload a local image; compressed and stored in `chrome.storage.local`                                                         |
+| **Weather & location**             | Shows local weather via Open-Meteo (free, no API key); auto-detects city via IP geolocation                                   |
+
+### Open Tabs (Right Column)
+
+| Feature                 | Description                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| **Domain grouping**     | Tabs auto-grouped into cards by domain; each card is collapsible                                    |
+| **Status grouping**     | Toggle to "Status" view to see tabs grouped as Important / Later / Active                           |
+| **Pinned tabs**         | Displayed in a separate section above regular tabs                                                  |
+| **Tab status tags**     | Mark any tab as **Later** (clock icon) or **Important** (flag icon); pills shown inline on the chip |
+| **Per-tab actions**     | Each chip has: ⭐ favorite, 📌 pin/unpin, 📋 add to daily tasks, ✕ close                            |
+| **Tab → Task**          | One-click button on each tab chip creates a Daily Planner task with that tab's title                |
+| **Duplicate detection** | Badge shows `Dupe ×N`; click to close all extras                                                    |
+| **Active sorting**      | Most recently visited domain group floats to top                                                    |
+| **Live sync**           | Tab open/close/switch in other windows auto-refreshes here (debounced 150ms)                        |
+| **Toolbar badge**       | Extension icon shows real tab count; color changes green → amber → red                              |
+| **Smart cleanup**       | Panel at bottom shows duplicate count and status                                                    |
+
+### Batch Operations
+
+| Feature                 | Description                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| **Select mode**         | Click "Select" to enter batch mode; checkboxes appear on every tab chip                        |
+| **Click to toggle**     | Click any chip or its checkbox to select/deselect                                              |
+| **Floating action bar** | Shows count of selected tabs + action buttons                                                  |
+| **Batch actions**       | Mark selected as Later / Important, add all to Daily Planner tasks, or close all selected tabs |
+| **Context-aware save**  | "+ Save All" button changes to "+ Save N tabs" when tabs are selected                          |
+
+### Saved Sessions
+
+| Feature             | Description                                                               |
+| ------------------- | ------------------------------------------------------------------------- |
+| **Save session**    | Save all open tabs (or only batch-selected tabs) as a named session       |
+| **Rename**          | Click any session name to rename inline (Enter to confirm, Esc to cancel) |
+| **Preview**         | Click a session row to expand and see all tabs with favicons              |
+| **Restore**         | "Open" button restores all session tabs in background                     |
+| **Delete**          | Permanent local deletion (no undo)                                        |
+| **Scrollable list** | Auto-scrolls when you have many saved sessions                            |
+
+### Top Bar
+
+| Feature                 | Description                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| **Command bar**         | Type a URL to navigate, or search terms to Google search; supports `localhost:3000` auto-protocol |
+| **Google Suggest**      | Autocomplete suggestions from Google as you type (proxied through service worker to bypass CSP)   |
+| **+ New Tab**           | Opens a new Chrome tab                                                                            |
+| **Export / Import**     | Full JSON backup of favorites, sections, tasks, hero text, avatar, theme, language                |
+| **Duplicate tab alert** | Banner appears when multiple Browser Organizer tabs are open; one-click to close extras           |
+| **Theme toggle**        | 6 themes: Light, Dark, Pink, Lavender, Sky, Sand                                                  |
+| **Language toggle**     | English ↔ 中文                                                                                    |
+
+---
+
+## Installation
+
+### Prerequisites
+
+- **Google Chrome** (or any Chromium-based browser like Edge, Brave, Arc)
+- No Node.js, npm, or build step required
+
+### Option A: Automated (via coding agent)
+
+If you use a coding agent (Claude Code, Cursor, Codex, etc.), point it at this repo and say "install this". It will:
+
+1. Copy the `extension/` path to your clipboard
+2. Open `chrome://extensions`
+3. Walk you through the 3 manual clicks
+
+### Option B: Manual Install
+
+**Step 1** — Clone or download this repo
+
+```bash
+git clone https://github.com/user/Browser_Organizer.git
+```
+
+**Step 2** — Open Chrome Extensions page
+
+Navigate to `chrome://extensions` in your browser.
+
+**Step 3** — Enable Developer Mode
+
+Toggle the **Developer mode** switch in the top-right corner.
+
+**Step 4** — Load the extension
+
+1. Click **"Load unpacked"** (top-left)
+2. In the file picker, navigate to the `extension/` folder inside this project
+   - **Mac**: Press `Cmd+Shift+G` to type a path directly
+   - **Windows/Linux**: Press `Ctrl+L` in the file picker
+3. Click **"Select"** / **"Open"**
+
+**Step 5** — Done!
+
+Open a new tab (`Cmd+T` / `Ctrl+T`). You'll see Browser Organizer.
+
+---
+
+## Getting Started
+
+When you first open Browser Organizer, you'll see a clean dashboard with three columns:
 
 ```
-/Users/yichenlin/Desktop/App/Browser_Organizer
+┌──────────────┬────────────────────────┬──────────────────┐
+│  FAVORITES   │     FOCUS AREA         │   OPEN TABS      │
+│              │                        │                  │
+│  (empty —    │  ✨ Good evening       │  Grouped by      │
+│   add your   │                        │  domain          │
+│   first!)    │  "Stay focused,        │                  │
+│              │   ship better things." │  [Domain] [Status]│
+│  [ + Add ]   │                        │  [Select]        │
+│              │  ┌─ Today Task ──────┐ │                  │
+│              │  │  (empty)          │ │  ┌─ GITHUB ────┐ │
+│              │  └───────────────────┘ │  │  repo-name   │ │
+│              │                        │  └──────────────┘ │
+│              │  ┌─ Daily Planner ──┐  │                  │
+│              │  │  May 2026        │  │  SAVED SESSIONS  │
+│              │  │  [calendar grid] │  │  [+ Save All]    │
+│              │  └───────────────────┘ │                  │
+└──────────────┴────────────────────────┴──────────────────┘
 ```
 
-它会一步步带你装好。约 1 分钟搞定。
+### Quick Tour
 
-### 方法 2：手动安装
+1. **Add your first favorite** — Click the `+` button in the left column, paste a URL, and hit save. The favicon is fetched automatically.
 
-**1. 确认项目路径**
+2. **Organize with sections** — Click "Section" to create groups like "Work", "Social", "Dev Tools". Drag favorites to reorder.
 
-当前项目路径是 `/Users/yichenlin/Desktop/App/Browser_Organizer`。
+3. **Manage open tabs** — The right column shows all your open tabs grouped by domain. Hover any tab to see action buttons.
 
-**2. 加载到 Chrome**
+4. **Mark tabs for later** — Hover a tab chip → click the clock icon (Later) or flag icon (Important). Tags persist across refreshes.
 
-1. 打开 Chrome，访问 `chrome://extensions`
-2. 右上角打开 **开发者模式**
-3. 点击 **加载已解压的扩展程序**
-4. 选择这个项目里的 `extension/` 文件夹
+5. **Batch operations** — Click "Select" in the tab header, check multiple tabs, then use the floating bar to close, mark, or save them.
 
-**3. 打开新标签页**
+6. **Save a session** — Click "+ Save All" to snapshot your current tabs. Click a saved session to preview its contents.
 
-你会看到 Browser Organizer 出现。
+7. **Plan your day** — Add tasks in the Today Task panel. Use the calendar to plan ahead up to a year.
 
-**更新方式**：本地修改代码后，到 `chrome://extensions` 找到 Browser Organizer 点击「重新加载」图标即可。
+8. **Add tabs as tasks** — Click the 📋 button on any tab chip to instantly create a planner task from that tab.
+
+9. **Customize your motto** — Double-click the hero title or subtitle to write your own.
+
+10. **Switch themes** — Click the theme dot (top-right) to cycle through 6 color schemes.
 
 ---
 
-## 工作原理
+## Usage Guide
+
+### Favorites
+
+- **Add**: Click `+` → enter URL → save (title auto-fills from URL)
+- **Edit**: Hover a favorite → click `⋯` → Edit
+- **Delete**: Hover → `⋯` → Delete
+- **Custom icon**: In the edit dialog, upload or `Cmd+V` paste an image
+- **Reorder**: Drag cards within a section
+- **Sections**: "Section" button to create; click section name to rename; arrows to reorder; collapse/expand
+
+### Tab Status Tags
+
+- **Later** (clock icon): Marks a tab you want to come back to — visual reminder
+- **Important** (flag icon): Marks a high-priority tab
+- Tags appear as colored pills (blue for Later, red for Important)
+- Tags persist in `chrome.storage.local` even across browser restarts
+
+### View Toggles
+
+- **Domain view** (default): Tabs grouped by website domain
+- **Status view**: Tabs grouped by Important → Later → Active
+- Toggle between views using the `[Domain] [Status]` buttons
+
+### Batch Mode
+
+1. Click **"Select"** to enter batch mode
+2. Click tabs or checkboxes to select them
+3. The floating bar shows: `N selected` + `Later` / `Important` / `+ Tasks` / `Close`
+4. The "+ Save All" button in Saved Sessions updates to "+ Save N tabs"
+5. Click **"Done"** to exit batch mode
+
+### Saved Sessions
+
+- **Save**: Click "+ Save All" (saves all open tabs) or select specific tabs first
+- **Preview**: Click the session row → expands to show all tabs with favicons
+- **Rename**: Click the session name → type new name → Enter
+- **Restore**: Click "Open" → all session tabs open in background
+- **Delete**: Click `✕` → permanently deleted (no undo, no trash)
+
+### Daily Planner
+
+- **Add task**: Type in the input field at the bottom, choose a tag, press Enter or click `+`
+- **Tags**: Work, Projects, Personal, Design, Web (auto-assigned when adding from tab)
+- **Complete**: Click the checkbox to mark done
+- **Delete**: Click the `✕` next to a task
+- **Calendar**: Click any date to view/add tasks for that day; dates with tasks show a count badge
+
+### Command Bar
+
+- Type a URL (e.g., `github.com`) → navigates directly (auto-adds `https://`)
+- Type a search query → Google search
+- Supports `localhost:3000`, IP addresses, etc.
+- Google Suggest autocomplete as you type
+
+### Export / Import
+
+- **Export**: Click "Export" → downloads a `.json` file containing:
+  - Favorites + cached icons
+  - Sections
+  - Daily tasks
+  - Hero title & subtitle
+  - Profile avatar
+  - Theme & language
+- **Import**: Click "Import" → select a JSON file → confirms before overwriting
+
+### Right-Click Menu
+
+On any webpage:
+
+- **Right-click the page** → "Add page to Browser Organizer favorites"
+- **Right-click a link** → "Add link to Browser Organizer favorites"
+
+---
+
+## Default Configuration
+
+When a new user installs Browser Organizer, these are the defaults:
+
+| Setting            | Default (EN)                                                                                        | Default (ZH)                                                             |
+| ------------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Hero title**     | "Stay focused, ship better things."                                                                 | "保持专注，把更好的东西做出来。"                                         |
+| **Hero subtitle**  | "A calm command center for the tabs you need, the links you trust, and the next thing worth doing." | "一个安静的控制台，放下你需要的标签、信任的链接，以及下一件值得做的事。" |
+| **Theme**          | `light` (warm off-white)                                                                            |                                                                          |
+| **Language**       | `en` (English)                                                                                      |                                                                          |
+| **Tab view**       | Domain (grouped by website)                                                                         |                                                                          |
+| **Favorites**      | Empty                                                                                               |                                                                          |
+| **Tasks**          | Empty                                                                                               |                                                                          |
+| **Saved sessions** | Empty                                                                                               |                                                                          |
+
+All data starts empty. The extension is ready to use immediately — no setup, no sign-in.
+
+---
+
+## Architecture
 
 ```
-打开新标签页
-  → 顶栏显示时钟、Command bar、Export/Import
-  → 左侧：长期收藏（分 section，可拖拽排序）
-  → 中间：Hero 问候 + Today Task + Daily Planner 日历
-  → 右侧：固定标签置顶 + 当前标签按域名分组
-           → 每个 chip 可收藏⭐ / 固定📌 / 关闭✕
-           → 点击 chip 直接切到那个标签
-           → 关掉一组（X + 撒花动画 + 音效）
-           → Chrome Profile 书签树（只读）
+extension/
+├── manifest.json      # Chrome MV3 manifest
+├── index.html         # New tab page (single HTML file)
+├── app.js             # All application logic (~5000 lines)
+├── style.css          # All styles (~3800 lines)
+├── storage.js         # Storage abstraction layer (chrome.storage.local)
+├── background.js      # Service worker: badge count, right-click menu, Google Suggest proxy
+├── config.local.js    # Optional local overrides (gitignored)
+└── icons/             # Extension icons
 ```
 
-所有运行都在 Chrome 扩展内部完成。无外部服务器、无 API 调用。`favorites / favoriteSections / dailyTasks / heroTitle / heroCopy / theme / profileImageDataUrl` 均保存在 `chrome.storage.local`；Chrome 的不同 profile 拥有彼此独立的本地存储。
+### How It Works
 
-**跨 profile / 跨设备迁移**：使用右上角 Export 导出 JSON，在目标 profile 的 Browser Organizer 里 Import 即可。导出包含已缓存成 `data:image` 的收藏图标快照；尚未缓存的 favicon 会在新 profile 里重新抓取。
+```
+Open new tab
+  → index.html loads
+  → app.js initializes:
+      1. Load theme, language, user data from chrome.storage.local
+      2. Render favorites column (left)
+      3. Render hero + today task + daily planner (center)
+      4. Query chrome.tabs API → render open tabs (right)
+      5. Render saved sessions
+  → Live listeners:
+      - chrome.tabs.onCreated / onRemoved / onUpdated → re-render tabs (debounced 150ms)
+      - chrome.storage.onChanged → re-render affected sections
+```
 
-**注意**：页面加载时会请求 Google Fonts（DM Sans 字体）。如需完全离线使用，可将字体文件下载到本地并修改 `index.html` 的 `<link>` 指向本地路径。
+### Tech Stack
 
----
+| Layer            | Technology                                                  |
+| ---------------- | ----------------------------------------------------------- |
+| Extension format | Chrome Manifest V3                                          |
+| Data storage     | `chrome.storage.local` + JSON Export/Import                 |
+| Tab management   | `chrome.tabs` API (direct, no abstraction)                  |
+| Favicon caching  | `apple-touch-icon` fallback chain → base64 `data:image`     |
+| Sound effects    | Web Audio API (synthesized, no audio files)                 |
+| Animations       | CSS transitions + `requestAnimationFrame` particles         |
+| Font             | DM Sans (Google Fonts CDN)                                  |
+| Localization     | Built-in i18n string table (EN / ZH)                        |
+| Background tasks | Service worker maintains toolbar badge + context menus      |
+| Weather          | Open-Meteo API (free, no key) + IP geolocation              |
+| Search suggest   | Google Suggest API (proxied through service worker for CSP) |
 
-## 技术栈
-
-| 用途                | 实现                                                    |
-| ------------------- | ------------------------------------------------------- |
-| 扩展框架            | Chrome Manifest V3                                      |
-| 数据存储            | `chrome.storage.local` + JSON Export / Import           |
-| 标签管理            | `chrome.tabs` API（直接访问，无中间层）                 |
-| Chrome profile 数据 | `chrome.bookmarks`（只读展示，不修改）                  |
-| 图标缓存            | `apple-touch-icon` fallback chain → `data:image` base64 |
-| 音效                | Web Audio API（合成噪音，无音频文件）                   |
-| 动效                | CSS transitions + `requestAnimationFrame` 粒子          |
-| 字体                | DM Sans（Google Fonts CDN）                             |
-| 多语言              | 自研 i18n 字符串表（英文 / 中文）                       |
-| 背景任务            | Service Worker（`background.js`）维护 badge 和右键菜单  |
-
-零 npm，零构建，零外部依赖（字体除外）。Clone 后直接 load `extension/` 文件夹即可运行。
-
----
-
-## 数据结构（`chrome.storage.local`）
-
-| Key                   | 说明                                                                                          |
-| --------------------- | --------------------------------------------------------------------------------------------- |
-| `favorites`           | 收藏数组，每条含 `id / url / title / slot / sectionId / sectionSlot / iconUrl? / customLogo?` |
-| `favoriteSections`    | Section 数组，每条含 `id / name / order / collapsed`                                          |
-| `dailyTasks`          | 每日任务数组，每条含 `id / title / tag / date / done / createdAt / updatedAt`                 |
-| `heroTitle`           | Hero 标题文案（可双击编辑）                                                                   |
-| `heroCopy`            | Hero 描述文案（可双击编辑）                                                                   |
-| `theme`               | `'light'` 或 `'dark'`                                                                         |
-| `profileImageDataUrl` | 头像 base64 data URL                                                                          |
-| `lang`                | `'en'` 或 `'zh'`                                                                              |
+**Zero npm. Zero build step. Zero external dependencies** (except Google Fonts CDN for the typeface). Clone → load `extension/` → done.
 
 ---
 
-## 自定义
+## Data Schema
 
-`extension/config.local.js`（gitignored）可放个性化配置，例如自定义某些 URL 的分组规则。参考代码里的 `LOCAL_LANDING_PAGE_PATTERNS` 和 `LOCAL_CUSTOM_GROUPS`。
+All data is stored in `chrome.storage.local`. Each Chrome profile has its own independent storage.
+
+| Key                   | Type     | Description                                                                                |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------ |
+| `favorites`           | `Array`  | Bookmarks. Each: `{ id, url, title, slot, sectionId, sectionSlot, iconUrl?, customLogo? }` |
+| `favoriteSections`    | `Array`  | Sections. Each: `{ id, name, order, collapsed }`                                           |
+| `dailyTasks`          | `Array`  | Tasks. Each: `{ id, title, tag, date, done, createdAt, updatedAt }`                        |
+| `tabStatuses`         | `Object` | Map of `{ [url]: "later" \| "important" }` — persists tab status tags                      |
+| `savedSessions`       | `Array`  | Sessions. Each: `{ id, name, createdAt, tabs: [{ url, title }] }`                          |
+| `heroTitle`           | `String` | Custom hero title (empty = use default)                                                    |
+| `heroCopy`            | `String` | Custom hero subtitle (empty = use default)                                                 |
+| `theme`               | `String` | `"light"` / `"dark"` / `"pink"` / `"lavender"` / `"sky"` / `"sand"`                        |
+| `lang`                | `String` | `"en"` or `"zh"`                                                                           |
+| `profileImageDataUrl` | `String` | Avatar as base64 data URL                                                                  |
+
+### Privacy
+
+- **No server** — all data stays in `chrome.storage.local`
+- **No account** — no sign-in, no OAuth, no `chrome.identity`
+- **No sync** — data does not use `chrome.storage.sync`; cross-profile migration uses manual JSON Export/Import
+- **No tracking** — no analytics, no telemetry
+- Weather uses free Open-Meteo API (no API key); IP geolocation uses ipapi.co / geojs.io for city detection only
+
+---
+
+## Customization
+
+### Themes
+
+6 built-in themes, toggled from the dot icon in the top-right corner:
+
+- **Light** — Warm off-white (default)
+- **Dark** — Deep charcoal
+- **Pink** — Soft rose
+- **Lavender** — Muted purple
+- **Sky** — Clean blue
+- **Sand** — Warm tan
+
+### Language
+
+Click the language button (`中` / `EN`) in the top bar to toggle between English and Chinese.
+
+### Local Config
+
+`extension/config.local.js` (gitignored) can hold personal overrides, for example custom URL grouping rules. See `LOCAL_LANDING_PAGE_PATTERNS` and `LOCAL_CUSTOM_GROUPS` in the source code.
+
+---
+
+## Updating
+
+After making local code changes:
+
+1. Go to `chrome://extensions`
+2. Find **Browser Organizer**
+3. Click the **reload** icon (↻)
+
+Your data is preserved — only the code is reloaded.
 
 ---
 
