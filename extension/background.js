@@ -13,7 +13,7 @@
  *   Red    (#b35a5a) → 21+ tabs   (time to cull!)
  */
 
-importScripts('storage.js');
+importScripts("storage.js");
 
 // ─── Badge updater ────────────────────────────────────────────────────────────
 
@@ -28,37 +28,36 @@ async function updateBadge() {
     const tabs = await chrome.tabs.query({});
 
     // Only count actual web pages — skip browser internals and extension pages
-    const count = tabs.filter(t => {
-      const url = t.url || '';
+    const count = tabs.filter((t) => {
+      const url = t.url || "";
       return (
-        !url.startsWith('chrome://') &&
-        !url.startsWith('chrome-extension://') &&
-        !url.startsWith('about:') &&
-        !url.startsWith('edge://') &&
-        !url.startsWith('brave://')
+        !url.startsWith("chrome://") &&
+        !url.startsWith("chrome-extension://") &&
+        !url.startsWith("about:") &&
+        !url.startsWith("edge://") &&
+        !url.startsWith("brave://")
       );
     }).length;
 
     // Don't show "0" — an empty badge is cleaner
-    await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
+    await chrome.action.setBadgeText({ text: count > 0 ? String(count) : "" });
 
     if (count === 0) return;
 
     // Pick badge color based on workload level
     let color;
     if (count <= 10) {
-      color = '#3d7a4a'; // Green — you're in control
+      color = "#3d7a4a"; // Green — you're in control
     } else if (count <= 20) {
-      color = '#b8892e'; // Amber — things are piling up
+      color = "#b8892e"; // Amber — things are piling up
     } else {
-      color = '#b35a5a'; // Red — time to focus and close some tabs
+      color = "#b35a5a"; // Red — time to focus and close some tabs
     }
 
     await chrome.action.setBadgeBackgroundColor({ color });
-
   } catch {
     // If something goes wrong, clear the badge rather than show stale data
-    chrome.action.setBadgeText({ text: '' });
+    chrome.action.setBadgeText({ text: "" });
   }
 }
 
@@ -72,14 +71,14 @@ chrome.runtime.onInstalled.addListener(() => {
   // — that's the recommended pattern for service-worker extensions.)
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
-      id:       'wolfy-favorite-page',
-      title:    'Add page to Browser Organizer favorites',
-      contexts: ['page'],
+      id: "wolfy-favorite-page",
+      title: "Add page to Browser Organizer favorites",
+      contexts: ["page"],
     });
     chrome.contextMenus.create({
-      id:       'wolfy-favorite-link',
-      title:    'Add link to Browser Organizer favorites',
-      contexts: ['link'],
+      id: "wolfy-favorite-link",
+      title: "Add link to Browser Organizer favorites",
+      contexts: ["link"],
     });
   });
 });
@@ -89,11 +88,19 @@ chrome.runtime.onInstalled.addListener(() => {
 // background-script context, where we don't share helpers).
 function brandFromUrl(url) {
   try {
-    const host = new URL(url).hostname.replace(/^www\./, '');
-    const parts = host.split('.');
-    const TLDS_2 = ['co.uk', 'co.jp', 'com.cn', 'com.tw', 'com.au', 'com.hk', 'co.kr'];
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    const parts = host.split(".");
+    const TLDS_2 = [
+      "co.uk",
+      "co.jp",
+      "com.cn",
+      "com.tw",
+      "com.au",
+      "com.hk",
+      "co.kr",
+    ];
     let brand;
-    if (parts.length >= 3 && TLDS_2.includes(parts.slice(-2).join('.'))) {
+    if (parts.length >= 3 && TLDS_2.includes(parts.slice(-2).join("."))) {
       brand = parts[parts.length - 3];
     } else if (parts.length >= 2) {
       brand = parts[parts.length - 2];
@@ -101,14 +108,16 @@ function brandFromUrl(url) {
       brand = parts[0];
     }
     return brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : url;
-  } catch { return url; }
+  } catch {
+    return url;
+  }
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   let url;
-  if (info.menuItemId === 'wolfy-favorite-page') {
+  if (info.menuItemId === "wolfy-favorite-page") {
     url = tab && tab.url;
-  } else if (info.menuItemId === 'wolfy-favorite-link') {
+  } else if (info.menuItemId === "wolfy-favorite-link") {
     url = info.linkUrl;
   } else {
     return;
@@ -116,32 +125,35 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (!url) return;
   const title = brandFromUrl(url);
-  // Skip browser-internal pages
-  if (url.startsWith('chrome://') ||
-      url.startsWith('chrome-extension://') ||
-      url.startsWith('about:') ||
-      url.startsWith('edge://') ||
-      url.startsWith('brave://')) {
+  // Skip browser-internal pages and unsafe protocols
+  if (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("about:") ||
+    url.startsWith("edge://") ||
+    url.startsWith("brave://") ||
+    /^(javascript|data|vbscript):/i.test(url)
+  ) {
     return;
   }
 
   try {
     const favorites = await self.TabHomeStorage.getFavorites();
-    if (favorites.some(f => f.url === url)) return;
+    if (favorites.some((f) => f.url === url)) return;
     // Place at the first free slot — no upper bound.
-    const taken = new Set(favorites.map(f => f.slot));
+    const taken = new Set(favorites.map((f) => f.slot));
     let slot = 0;
     while (taken.has(slot)) slot++;
     favorites.push({
-      id:      Date.now().toString(),
+      id: Date.now().toString(),
       url,
-      title:   title || url,
+      title: title || url,
       addedAt: new Date().toISOString(),
       slot,
     });
     await self.TabHomeStorage.setFavorites(favorites);
   } catch (err) {
-    console.warn('[wolfy] context menu favorite failed:', err);
+    console.warn("[wolfy] context menu favorite failed:", err);
   }
 });
 

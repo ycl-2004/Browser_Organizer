@@ -1,296 +1,549 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Browser Organizer</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Browser Organizer</title>
 
-  <!-- Google Fonts: DM Sans is the only typeface used across the page. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div class="app-shell">
-
-  <!-- ================================================================
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- ================================================================
        TOPBAR — time, command input, theme, profile
        ================================================================ -->
-  <header class="topbar">
-    <div class="topbar-meta" aria-label="Today">
-      <!-- Written by app.js so the locale follows the existing i18n toggle. -->
-      <div class="date" id="dateDisplay"></div>
-      <div class="time" id="timeDisplay"></div>
-      <div class="location-weather" id="locationDisplay">Local</div>
-      <div class="weather-pill" id="weatherDisplay">Weather off</div>
-    </div>
-
-    <form class="command-bar" id="commandForm" role="search">
-      <label class="sr-only" for="commandInput">Search or open a website</label>
-      <input id="commandInput" type="search" placeholder="Search or type a URL..." autocomplete="off" spellcheck="false">
-    </form>
-
-    <div class="topbar-actions">
-      <button class="new-tab-btn" type="button" data-action="open-new-tab">
-        <span>+</span>
-        <span>New Tab</span>
-      </button>
-      <button class="data-transfer-btn" type="button" data-action="export-data">Export</button>
-      <button class="data-transfer-btn" type="button" data-action="import-data">Import</button>
-      <input id="importDataInput" type="file" accept="application/json,.json" hidden>
-      <!-- Browser Organizer duplicate-tabs pill — appears when more than one new-tab page
-           is open. Hidden by default; app.js shows it as inline-flex. -->
-      <div class="tab-cleanup-banner" id="tabOutDupeBanner" style="display:none">
-        <div class="tab-cleanup-left">
-          <div class="tab-cleanup-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-            </svg>
-          </div>
-          <div class="tab-cleanup-text">
-            <strong id="tabOutDupeCount"></strong> Browser Organizer tabs open
-          </div>
+      <header class="topbar">
+        <div class="topbar-meta" aria-label="Today">
+          <!-- Written by app.js so the locale follows the existing i18n toggle. -->
+          <div class="date" id="dateDisplay"></div>
+          <div class="time" id="timeDisplay"></div>
+          <div class="location-weather" id="locationDisplay">Local</div>
+          <div class="weather-pill" id="weatherDisplay">Weather off</div>
         </div>
-        <button class="tab-cleanup-btn" data-action="close-tabout-dupes">Keep one</button>
-      </div>
-      <button class="theme-toggle" id="themeToggle" data-action="toggle-theme" title="Toggle theme"></button>
-      <label class="profile-avatar" for="profileImageInput" aria-label="Upload profile image">
-        <input id="profileImageInput" type="file" accept="image/*" hidden>
-        <img id="profileImage" alt="">
-        <span id="profileInitials">TH</span>
-      </label>
-    </div>
-  </header>
 
-  <!-- ================================================================
+        <form class="command-bar" id="commandForm" role="search">
+          <label class="sr-only" for="commandInput"
+            >Search or open a website</label
+          >
+          <input
+            id="commandInput"
+            type="search"
+            placeholder="Search or type a URL..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </form>
+
+        <div class="topbar-actions">
+          <button class="new-tab-btn" type="button" data-action="open-new-tab">
+            <span>+</span>
+            <span>New Tab</span>
+          </button>
+          <button
+            class="data-transfer-btn"
+            type="button"
+            data-action="export-data"
+          >
+            Export
+          </button>
+          <button
+            class="data-transfer-btn"
+            type="button"
+            data-action="import-data"
+          >
+            Import
+          </button>
+          <input
+            id="importDataInput"
+            type="file"
+            accept="application/json,.json"
+            hidden
+          />
+          <!-- Browser Organizer duplicate-tabs pill — appears when more than one new-tab page
+           is open. Hidden by default; app.js shows it as inline-flex. -->
+          <div
+            class="tab-cleanup-banner"
+            id="tabOutDupeBanner"
+            style="display: none"
+          >
+            <div class="tab-cleanup-left">
+              <div class="tab-cleanup-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75"
+                  />
+                </svg>
+              </div>
+              <div class="tab-cleanup-text">
+                <strong id="tabOutDupeCount"></strong> Browser Organizer tabs
+                open
+              </div>
+            </div>
+            <button class="tab-cleanup-btn" data-action="close-tabout-dupes">
+              Keep one
+            </button>
+          </div>
+          <button class="lang-toggle" id="langToggle" data-action="toggle-lang">
+            中
+          </button>
+          <button
+            class="theme-toggle"
+            id="themeToggle"
+            data-action="toggle-theme"
+            title="Toggle theme"
+          ></button>
+          <label
+            class="profile-avatar"
+            for="profileImageInput"
+            aria-label="Upload profile image"
+          >
+            <input id="profileImageInput" type="file" accept="image/*" hidden />
+            <img id="profileImage" alt="" />
+            <span id="profileInitials">TH</span>
+          </label>
+        </div>
+      </header>
+
+      <!-- ================================================================
        MAIN CONTENT AREA — three-column productivity dashboard
        ================================================================ -->
-  <main class="dashboard-grid" id="dashboardColumns">
+      <main class="dashboard-grid" id="dashboardColumns">
+        <!-- LEFT COLUMN: Long-term favorites -->
+        <aside class="favorites-column" id="favoritesColumn">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Pinned places</p>
+              <h2>Favorites</h2>
+            </div>
+            <div class="favorites-heading-actions">
+              <button
+                class="section-add-btn"
+                id="favoriteSectionAdd"
+                data-action="add-favorite-section"
+                title="Add a section"
+              >
+                Section
+              </button>
+              <button
+                class="favorites-add-btn"
+                id="favoritesAddToggle"
+                data-action="toggle-favorite-form"
+                title="Add a favorite"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="2"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
 
-    <!-- LEFT COLUMN: Long-term favorites -->
-    <aside class="favorites-column" id="favoritesColumn">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Pinned places</p>
-          <h2>Favorites</h2>
+          <!-- Favorite sections — populated by renderFavoritesColumn() -->
+          <div class="favorite-sections-list" id="favoriteSectionsList"></div>
+
+          <!-- Empty state -->
+          <div
+            class="favorites-empty"
+            id="favoritesEmpty"
+            style="display: none"
+          >
+            Nothing pinned yet. Click + to add a URL, or star a tab on the
+            right.
+          </div>
+        </aside>
+
+        <!-- CENTER COLUMN: Focus dashboard scaffolding for Phase 1 -->
+        <section class="main-column" aria-label="Focus dashboard">
+          <section class="hero-section">
+            <div class="hero-kicker">
+              <span class="hero-sun" aria-hidden="true">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.6"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364-6.364-1.591 1.591M7.227 16.773l-1.591 1.591m12.728 0-1.591-1.591M7.227 7.227 5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"
+                  />
+                </svg>
+              </span>
+              <p class="eyebrow" id="heroEyebrow">Good morning</p>
+            </div>
+            <h1 id="heroTitle">Stay focused, ship better things.</h1>
+            <div class="hero-rule" aria-hidden="true"></div>
+            <p
+              class="hero-copy"
+              id="heroCopy"
+              tabindex="0"
+              title="Double-click to edit"
+            >
+              A calm command center for the tabs you need, the links you trust,
+              and the next thing worth doing.
+            </p>
+            <div class="hero-dots" aria-hidden="true"></div>
+            <div class="hero-orb" aria-hidden="true"></div>
+          </section>
+
+          <section class="todo-panel dashboard-panel todo-panel-expanded">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Next actions</p>
+                <h2 id="todoPanelTitle">Today Task</h2>
+              </div>
+              <span class="todo-count" id="todoCount">0</span>
+            </div>
+            <div class="todo-list todo-list-compact" id="todoList"></div>
+
+            <section class="daily-planner" aria-label="Daily planner">
+              <div class="daily-planner-header">
+                <div>
+                  <p class="eyebrow" id="plannerEyebrow">Daily planner</p>
+                  <h3 id="plannerMonthLabel">May 2026</h3>
+                </div>
+                <div class="planner-nav">
+                  <button
+                    type="button"
+                    data-action="planner-prev-month"
+                    aria-label="Previous month"
+                  >
+                    ‹
+                  </button>
+                  <button type="button" data-action="planner-today">
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    data-action="planner-next-month"
+                    aria-label="Next month"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              <div class="calendar-grid" id="calendarGrid"></div>
+
+              <div class="selected-day-panel">
+                <div class="selected-day-header">
+                  <span id="selectedDateLabel">Selected day</span>
+                  <small id="selectedDateCount">0 tasks</small>
+                </div>
+
+                <div class="selected-day-tasks" id="selectedDayTasks"></div>
+
+                <form
+                  class="todo-form selected-day-form"
+                  id="selectedDayTodoForm"
+                >
+                  <input
+                    id="selectedDayTodoInput"
+                    type="text"
+                    placeholder="Add task for selected day..."
+                    autocomplete="off"
+                  />
+                  <select id="selectedDayTodoTagInput" aria-label="Task tag">
+                    <option value="Work">Work</option>
+                    <option value="Projects">Projects</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Design">Design</option>
+                  </select>
+                  <button type="submit" aria-label="Add task">+</button>
+                </form>
+              </div>
+            </section>
+          </section>
+        </section>
+
+        <!-- RIGHT COLUMN: Open tabs (pinned at the top, regular below) -->
+        <aside
+          class="tabs-column active-section"
+          id="openTabsSection"
+          style="display: none"
+        >
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Now open</p>
+              <h2 id="openTabsSectionTitle">Open Tabs</h2>
+            </div>
+            <div class="section-count" id="openTabsSectionCount"></div>
+          </div>
+
+          <!-- Pinned-tabs sub-section — only shown when at least one tab is pinned. -->
+          <div
+            class="active-subsection"
+            id="pinnedSubSection"
+            style="display: none"
+          >
+            <div class="section-header compact-section-header">
+              <h2 id="pinnedSectionTitle">Pinned</h2>
+              <div class="section-line"></div>
+              <div class="section-count" id="pinnedSectionCount"></div>
+            </div>
+            <div class="missions" id="pinnedMissions"></div>
+          </div>
+
+          <!-- Regular open-tabs sub-section. -->
+          <div class="active-subsection" id="openTabsSubSection">
+            <div class="section-header compact-section-header">
+              <h2>By domain</h2>
+              <div class="section-line"></div>
+              <!-- "Close all N tabs" lives at the right edge of the header -->
+              <div class="section-action" id="openTabsSectionAction"></div>
+            </div>
+            <div class="missions" id="openTabsMissions"></div>
+          </div>
+
+          <div class="smart-cleanup-card" id="smartCleanupCard">
+            <div>
+              <p class="eyebrow">Smart cleanup</p>
+              <strong id="statTabs">—</strong>
+              <span>open tabs tracked locally</span>
+            </div>
+          </div>
+
+          <section
+            class="profile-library dashboard-panel"
+            id="profileLibraryPanel"
+          >
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow" id="profileLibraryEyebrow">Chrome profile</p>
+                <h2 id="profileLibraryTitle">Bookmarks & Lists</h2>
+              </div>
+              <div class="profile-library-actions">
+                <button
+                  class="profile-library-manager"
+                  type="button"
+                  data-action="collapse-bookmarks"
+                  id="profileLibraryCollapse"
+                >
+                  Collapse all
+                </button>
+                <button
+                  class="profile-library-manager"
+                  type="button"
+                  data-action="expand-bookmarks"
+                  id="profileLibraryExpand"
+                >
+                  Expand all
+                </button>
+                <button
+                  class="profile-library-more"
+                  type="button"
+                  data-action="open-bookmark-manager"
+                  id="profileLibraryManager"
+                  title="Open Chrome Bookmark Manager"
+                >
+                  ⋮
+                </button>
+              </div>
+            </div>
+
+            <div class="profile-library-section">
+              <div class="profile-library-subhead">
+                <span id="profileBookmarksTitle">Bookmarks</span>
+                <small id="profileBookmarksCount">0</small>
+              </div>
+              <div class="profile-link-list" id="profileBookmarksList"></div>
+            </div>
+          </section>
+        </aside>
+      </main>
+      <!-- end .dashboard-grid -->
+    </div>
+    <!-- end .app-shell -->
+
+    <!-- ================================================================
+     FAVORITES ADD / EDIT MODAL — floats over the page; backdrop closes
+     ================================================================ -->
+    <div class="favorites-modal" id="favoritesModal" style="display: none">
+      <form class="favorites-form favorites-form-modal" id="favoritesForm">
+        <label
+          class="favorites-form-label"
+          for="favoritesUrlInput"
+          id="favoritesUrlLabel"
+          >URL</label
+        >
+        <input
+          type="text"
+          class="favorites-form-input"
+          id="favoritesUrlInput"
+          placeholder="https://..."
+          required
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <label
+          class="favorites-form-label"
+          for="favoritesTitleInput"
+          id="favoritesTitleLabel"
+          >Title</label
+        >
+        <input
+          type="text"
+          class="favorites-form-input"
+          id="favoritesTitleInput"
+          placeholder="Title (optional)"
+          autocomplete="off"
+        />
+        <label
+          class="favorites-form-label"
+          for="favoritesSectionInput"
+          id="favoritesSectionLabel"
+          >Section</label
+        >
+        <select
+          class="favorites-form-input"
+          id="favoritesSectionInput"
+        ></select>
+
+        <!-- Custom logo: preview + upload + reset -->
+        <div class="favorites-form-logo">
+          <div class="favorites-logo-preview" id="favoritesLogoPreview">
+            <span
+              class="favorites-logo-placeholder"
+              id="favoritesLogoPlaceholder"
+              >Auto</span
+            >
+            <img id="favoritesLogoPreviewImg" alt="" style="display: none" />
+          </div>
+          <label for="favoritesLogoInput" class="favorites-logo-upload"
+            >Upload logo</label
+          >
+          <input type="file" id="favoritesLogoInput" accept="image/*" hidden />
+          <button
+            type="button"
+            class="favorites-logo-reset"
+            data-action="reset-favorite-logo"
+          >
+            Reset
+          </button>
         </div>
-        <div class="favorites-heading-actions">
-          <button class="section-add-btn" id="favoriteSectionAdd" data-action="add-favorite-section" title="Add a section">Section</button>
-          <button class="favorites-add-btn" id="favoritesAddToggle" data-action="toggle-favorite-form" title="Add a favorite">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+
+        <div class="favorites-form-actions">
+          <!-- Delete only shown while editing an existing favorite -->
+          <button
+            type="button"
+            class="favorites-form-delete"
+            id="favoritesFormDelete"
+            data-action="delete-from-form"
+            style="display: none"
+          >
+            Delete
+          </button>
+          <div class="favorites-form-actions-right">
+            <button
+              type="button"
+              class="favorites-form-cancel"
+              data-action="cancel-favorite-form"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="favorites-form-submit"
+              id="favoritesFormSubmit"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- ================================================================
+     CONFIRM DIALOG — generic in-page modal that replaces window.confirm()
+     ================================================================ -->
+    <div class="confirm-modal" id="confirmModal" style="display: none">
+      <div class="confirm-card">
+        <div class="confirm-message" id="confirmMessage"></div>
+        <div class="confirm-actions">
+          <button type="button" class="confirm-cancel" id="confirmCancelBtn">
+            Cancel
+          </button>
+          <button type="button" class="confirm-ok" id="confirmOkBtn">
+            Confirm
           </button>
         </div>
       </div>
+    </div>
 
-      <!-- Favorite sections — populated by renderFavoritesColumn() -->
-      <div class="favorite-sections-list" id="favoriteSectionsList"></div>
-
-      <!-- Empty state -->
-      <div class="favorites-empty" id="favoritesEmpty" style="display:none">
-        Nothing pinned yet. Click + to add a URL, or star a tab on the right.
-      </div>
-    </aside>
-
-    <!-- CENTER COLUMN: Focus dashboard scaffolding for Phase 1 -->
-    <section class="main-column" aria-label="Focus dashboard">
-      <section class="hero-section">
-        <div class="hero-kicker">
-          <span class="hero-sun" aria-hidden="true">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364-6.364-1.591 1.591M7.227 16.773l-1.591 1.591m12.728 0-1.591-1.591M7.227 7.227 5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-            </svg>
-          </span>
-          <p class="eyebrow" id="heroEyebrow">Good morning</p>
-        </div>
-        <h1 id="heroTitle">Stay focused, ship better things.</h1>
-        <div class="hero-rule" aria-hidden="true"></div>
-        <p class="hero-copy" id="heroCopy" tabindex="0" title="Double-click to edit">A calm command center for the tabs you need, the links you trust, and the next thing worth doing.</p>
-        <div class="hero-dots" aria-hidden="true"></div>
-        <div class="hero-orb" aria-hidden="true"></div>
-      </section>
-
-      <section class="todo-panel dashboard-panel todo-panel-expanded">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">Next actions</p>
-            <h2 id="todoPanelTitle">Today Task</h2>
-          </div>
-          <span class="todo-count" id="todoCount">0</span>
-        </div>
-        <div class="todo-list todo-list-compact" id="todoList"></div>
-
-        <section class="daily-planner" aria-label="Daily planner">
-          <div class="daily-planner-header">
-            <div>
-              <p class="eyebrow" id="plannerEyebrow">Daily planner</p>
-              <h3 id="plannerMonthLabel">May 2026</h3>
-            </div>
-            <div class="planner-nav">
-              <button type="button" data-action="planner-prev-month" aria-label="Previous month">‹</button>
-              <button type="button" data-action="planner-today">Today</button>
-              <button type="button" data-action="planner-next-month" aria-label="Next month">›</button>
-            </div>
-          </div>
-
-          <div class="calendar-grid" id="calendarGrid"></div>
-
-          <div class="selected-day-panel">
-            <div class="selected-day-header">
-              <span id="selectedDateLabel">Selected day</span>
-              <small id="selectedDateCount">0 tasks</small>
-            </div>
-
-            <div class="selected-day-tasks" id="selectedDayTasks"></div>
-
-            <form class="todo-form selected-day-form" id="selectedDayTodoForm">
-              <input id="selectedDayTodoInput" type="text" placeholder="Add task for selected day..." autocomplete="off">
-              <select id="selectedDayTodoTagInput" aria-label="Task tag">
-                <option value="Work">Work</option>
-                <option value="Projects">Projects</option>
-                <option value="Personal">Personal</option>
-                <option value="Design">Design</option>
-              </select>
-              <button type="submit" aria-label="Add task">+</button>
-            </form>
-          </div>
-        </section>
-      </section>
-    </section>
-
-    <!-- RIGHT COLUMN: Open tabs (pinned at the top, regular below) -->
-    <aside class="tabs-column active-section" id="openTabsSection" style="display:none">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">Now open</p>
-          <h2 id="openTabsSectionTitle">Open Tabs</h2>
-        </div>
-        <div class="section-count" id="openTabsSectionCount"></div>
-      </div>
-
-      <!-- Pinned-tabs sub-section — only shown when at least one tab is pinned. -->
-      <div class="active-subsection" id="pinnedSubSection" style="display:none">
-        <div class="section-header compact-section-header">
-          <h2 id="pinnedSectionTitle">Pinned</h2>
-          <div class="section-line"></div>
-          <div class="section-count" id="pinnedSectionCount"></div>
-        </div>
-        <div class="missions" id="pinnedMissions"></div>
-      </div>
-
-      <!-- Regular open-tabs sub-section. -->
-      <div class="active-subsection" id="openTabsSubSection">
-        <div class="section-header compact-section-header">
-          <h2>By domain</h2>
-          <div class="section-line"></div>
-          <!-- "Close all N tabs" lives at the right edge of the header -->
-          <div class="section-action" id="openTabsSectionAction"></div>
-        </div>
-        <div class="missions" id="openTabsMissions"></div>
-      </div>
-
-      <div class="smart-cleanup-card" id="smartCleanupCard">
-        <div>
-          <p class="eyebrow">Smart cleanup</p>
-          <strong id="statTabs">—</strong>
-          <span>open tabs tracked locally</span>
-        </div>
-      </div>
-
-      <section class="profile-library dashboard-panel" id="profileLibraryPanel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow" id="profileLibraryEyebrow">Chrome profile</p>
-            <h2 id="profileLibraryTitle">Bookmarks & Lists</h2>
-          </div>
-          <div class="profile-library-actions">
-            <button class="profile-library-manager" type="button" data-action="collapse-bookmarks" id="profileLibraryCollapse">Collapse all</button>
-            <button class="profile-library-manager" type="button" data-action="expand-bookmarks" id="profileLibraryExpand">Expand all</button>
-            <button class="profile-library-more" type="button" data-action="open-bookmark-manager" id="profileLibraryManager" title="Open Chrome Bookmark Manager">⋮</button>
-          </div>
-        </div>
-
-        <div class="profile-library-section">
-          <div class="profile-library-subhead">
-            <span id="profileBookmarksTitle">Bookmarks</span>
-            <small id="profileBookmarksCount">0</small>
-          </div>
-          <div class="profile-link-list" id="profileBookmarksList"></div>
-        </div>
-      </section>
-    </aside>
-
-  </main><!-- end .dashboard-grid -->
-
-</div><!-- end .app-shell -->
-
-<!-- ================================================================
-     FAVORITES ADD / EDIT MODAL — floats over the page; backdrop closes
+    <!-- ================================================================
+     PROMPT DIALOG — generic in-page modal that replaces window.prompt()
      ================================================================ -->
-<div class="favorites-modal" id="favoritesModal" style="display:none">
-  <form class="favorites-form favorites-form-modal" id="favoritesForm">
-    <label class="favorites-form-label" for="favoritesUrlInput" id="favoritesUrlLabel">URL</label>
-    <input type="text" class="favorites-form-input" id="favoritesUrlInput" placeholder="https://..." required autocomplete="off" spellcheck="false">
-    <label class="favorites-form-label" for="favoritesTitleInput" id="favoritesTitleLabel">Title</label>
-    <input type="text" class="favorites-form-input" id="favoritesTitleInput" placeholder="Title (optional)" autocomplete="off">
-    <label class="favorites-form-label" for="favoritesSectionInput" id="favoritesSectionLabel">Section</label>
-    <select class="favorites-form-input" id="favoritesSectionInput"></select>
-
-    <!-- Custom logo: preview + upload + reset -->
-    <div class="favorites-form-logo">
-      <div class="favorites-logo-preview" id="favoritesLogoPreview">
-        <span class="favorites-logo-placeholder" id="favoritesLogoPlaceholder">Auto</span>
-        <img id="favoritesLogoPreviewImg" alt="" style="display:none">
-      </div>
-      <label for="favoritesLogoInput" class="favorites-logo-upload">Upload logo</label>
-      <input type="file" id="favoritesLogoInput" accept="image/*" hidden>
-      <button type="button" class="favorites-logo-reset" data-action="reset-favorite-logo">Reset</button>
-    </div>
-
-    <div class="favorites-form-actions">
-      <!-- Delete only shown while editing an existing favorite -->
-      <button type="button" class="favorites-form-delete" id="favoritesFormDelete" data-action="delete-from-form" style="display:none">Delete</button>
-      <div class="favorites-form-actions-right">
-        <button type="button" class="favorites-form-cancel" data-action="cancel-favorite-form">Cancel</button>
-        <button type="submit" class="favorites-form-submit" id="favoritesFormSubmit">Add</button>
+    <div class="confirm-modal" id="promptModal" style="display: none">
+      <div class="confirm-card">
+        <div class="confirm-message" id="promptMessage"></div>
+        <input
+          type="text"
+          class="favorites-form-input"
+          id="promptInput"
+          autocomplete="off"
+          style="margin-bottom: 10px"
+        />
+        <div class="confirm-actions">
+          <button type="button" class="confirm-cancel" id="promptCancelBtn">
+            Cancel
+          </button>
+          <button type="button" class="confirm-ok" id="promptOkBtn">OK</button>
+        </div>
       </div>
     </div>
-  </form>
-</div>
 
-<!-- ================================================================
-     CONFIRM DIALOG — generic in-page modal that replaces window.confirm()
-     ================================================================ -->
-<div class="confirm-modal" id="confirmModal" style="display:none">
-  <div class="confirm-card">
-    <div class="confirm-message" id="confirmMessage"></div>
-    <div class="confirm-actions">
-      <button type="button" class="confirm-cancel" id="confirmCancelBtn">Cancel</button>
-      <button type="button" class="confirm-ok" id="confirmOkBtn">Confirm</button>
-    </div>
-  </div>
-</div>
-
-<!-- ================================================================
+    <!-- ================================================================
      TOAST — floats above everything, used for action confirmations
      Hidden by default via CSS (opacity:0, translateY)
      ================================================================ -->
-<div class="toast" id="toast">
-  <!-- Checkmark circle icon (Heroicons outline) -->
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-  </svg>
-  <span id="toastText"></span>
-</div>
+    <div class="toast" id="toast">
+      <!-- Checkmark circle icon (Heroicons outline) -->
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="2"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+        />
+      </svg>
+      <span id="toastText"></span>
+    </div>
 
-<!-- Personal config (gitignored) — defines LOCAL_LANDING_PAGE_PATTERNS etc. -->
-<!-- If the file doesn't exist, that's fine — app.js uses sensible defaults. -->
-<script src="config.local.js" onerror="/* no personal config, that's fine */"></script>
+    <!-- Personal config (gitignored) — defines LOCAL_LANDING_PAGE_PATTERNS etc. -->
+    <!-- If the file doesn't exist, that's fine — app.js uses sensible defaults. -->
+    <script
+      src="config.local.js"
+      onerror="/* no personal config, that's fine */"
+    ></script>
 
-<!-- Shared storage helpers: local-only UI state plus JSON backup / restore -->
-<script src="storage.js"></script>
+    <!-- Shared storage helpers: local-only UI state plus JSON backup / restore -->
+    <script src="storage.js"></script>
 
-<!-- Main dashboard logic — loads last so the DOM is ready -->
-<script src="app.js"></script>
-</body>
+    <!-- Main dashboard logic — loads last so the DOM is ready -->
+    <script src="app.js"></script>
+  </body>
 </html>
