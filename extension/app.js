@@ -1179,11 +1179,26 @@ function ensurePlannerSelection() {
 async function pruneExpiredDailyTasks() {
   const todayKey = toLocalDateKey(new Date());
   const maxKey = getPlannerMaxDateKey();
-  const filtered = sortDailyTasks(
-    dailyTasks.filter((task) => task.date >= todayKey && task.date <= maxKey),
-  );
-  const changed = filtered.length !== dailyTasks.length;
-  dailyTasks = filtered;
+  let changed = false;
+
+  const kept = [];
+  for (const task of dailyTasks) {
+    if (task.date > maxKey) continue; // beyond planner range — drop
+    if (task.date < todayKey) {
+      if (task.done) {
+        changed = true;
+        continue;
+      } // done & past — drop
+      // undone & past — carry forward to today
+      task.originalDate = task.originalDate || task.date;
+      task.overdue = true;
+      task.date = todayKey;
+      changed = true;
+    }
+    kept.push(task);
+  }
+
+  dailyTasks = sortDailyTasks(kept);
   if (changed) {
     dailyTasks = await TabHomeStorage.setDailyTasks(dailyTasks);
   }
@@ -1197,13 +1212,13 @@ async function loadDailyTasks() {
   ensurePlannerSelection();
 }
 
-async function persistDailyTasks() {
-  dailyTasks = sortDailyTasks(dailyTasks);
+async function persistDailyTasks({ skipSort = false } = {}) {
+  if (!skipSort) dailyTasks = sortDailyTasks(dailyTasks);
   dailyTasks = await TabHomeStorage.setDailyTasks(dailyTasks);
 }
 
 function getTasksForDate(dateKey) {
-  return sortDailyTasks(dailyTasks.filter((task) => task.date === dateKey));
+  return dailyTasks.filter((task) => task.date === dateKey);
 }
 
 function getTodayTasks() {
@@ -1216,13 +1231,19 @@ function renderDailyTaskRow(task) {
   const tag = escapeHtml(task.tag || "Work");
   const checked = task.done ? "checked" : "";
   const doneClass = task.done ? " is-done" : "";
+  const overdueClass = task.overdue && !task.done ? " is-overdue" : "";
+  const overdueBadge =
+    task.overdue && !task.done
+      ? `<span class="todo-overdue-badge">OVERDUE</span>`
+      : "";
 
   return `
-    <div class="todo-item daily-task-row${doneClass}" data-task-id="${id}">
+    <div class="todo-item daily-task-row${doneClass}${overdueClass}" data-task-id="${id}" draggable="true">
+      <span class="todo-drag-handle" title="Drag to reorder">⠿</span>
       <label class="todo-check-wrap" aria-label="${task.done ? "Done" : "Pending"}">
         <input type="checkbox" data-action="toggle-daily-task" data-task-id="${id}" ${checked}>
       </label>
-      <span class="todo-title">${title}</span>
+      <span class="todo-title">${title}${overdueBadge}</span>
       <span class="todo-tag">${tag}</span>
       <button class="todo-delete" type="button" data-action="delete-daily-task" data-task-id="${id}" aria-label="Delete task">×</button>
     </div>
@@ -1397,6 +1418,84 @@ async function deleteDailyTask(id) {
   renderDailyPlanner();
   return true;
 }
+
+/* ---- Task drag-to-reorder ---- */
+let _taskDragReorder = false;
+
+function initTaskDragListeners(listEl) {
+  if (!listEl) return;
+  let dragId = null;
+
+  listEl.addEventListener("dragstart", (e) => {
+    const row = e.target.closest(".daily-task-row");
+    if (!row) return;
+    dragId = row.dataset.taskId;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", dragId);
+    requestAnimationFrame(() => row.classList.add("is-dragging"));
+  });
+
+  listEl.addEventListener("dragend", (e) => {
+    const row = e.target.closest(".daily-task-row");
+    if (row) row.classList.remove("is-dragging");
+    listEl
+      .querySelectorAll(".drag-over")
+      .forEach((el) => el.classList.remove("drag-over"));
+    dragId = null;
+  });
+
+  listEl.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+  });
+
+  listEl.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const row = e.target.closest(".daily-task-row");
+    if (row && row.dataset.taskId !== dragId) {
+      listEl
+        .querySelectorAll(".drag-over")
+        .forEach((el) => el.classList.remove("drag-over"));
+      row.classList.add("drag-over");
+    }
+  });
+
+  listEl.addEventListener("dragleave", (e) => {
+    const row = e.target.closest(".daily-task-row");
+    if (row) row.classList.remove("drag-over");
+  });
+
+  listEl.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const targetRow = e.target.closest(".daily-task-row");
+    console.log("[DnD] drop fired", {
+      target: e.target.tagName,
+      targetRow: !!targetRow,
+      dragId,
+    });
+    if (!targetRow || !dragId) return;
+    const targetId = targetRow.dataset.taskId;
+    console.log("[DnD] dragId:", dragId, "targetId:", targetId);
+    if (targetId === dragId) return;
+
+    const fromIdx = dailyTasks.findIndex((t) => t.id === dragId);
+    const toIdx = dailyTasks.findIndex((t) => t.id === targetId);
+    console.log("[DnD] fromIdx:", fromIdx, "toIdx:", toIdx);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    const [moved] = dailyTasks.splice(fromIdx, 1);
+    dailyTasks.splice(toIdx, 0, moved);
+    _taskDragReorder = true;
+    await persistDailyTasks({ skipSort: true });
+    renderDailyPlanner();
+  });
+}
+
+// Initialize drag listeners once DOM is ready
+document.addEventListener("DOMContentLoaded", () => {
+  initTaskDragListeners(document.getElementById("todoList"));
+  initTaskDragListeners(document.getElementById("selectedDayTasks"));
+});
 
 async function getProfileImageDataUrl() {
   const { profileImageDataUrl = "" } = await chrome.storage.local.get(
@@ -2746,6 +2845,7 @@ function getDisplayTabs() {
   return openTabs.filter((t) => {
     const url = t.url || "";
     if (!url) return false;
+    if (t.isTabOut) return false;
     if (url.startsWith("about:")) return false;
     if (url.startsWith("edge://") || url.startsWith("brave://")) return false;
     return true;
@@ -2797,7 +2897,7 @@ function buildOverflowChips(
       const chipClass = count > 1 ? " chip-has-dupes" : "";
       const isFav = favoritedUrls.has(tab.url);
       const isPinned = !!tab.pinned;
-      const faviconUrl = getFaviconUrl(tab.url, 32);
+      const faviconUrl = getFaviconUrl(tab.url, 64);
       return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
       <input class="batch-check" type="checkbox" data-action="batch-select-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
@@ -2887,7 +2987,7 @@ function renderDomainCard(group, favoritedUrls = new Set()) {
         const statusPill = status
           ? `<span class="chip-status-pill chip-status-${status}">${status === "later" ? "Later" : "Important"}</span>`
           : "";
-        const faviconUrl = getFaviconUrl(tab.url, 32);
+        const faviconUrl = getFaviconUrl(tab.url, 64);
         return `<div class="page-chip clickable${chipClass}${status ? ` chip-${status}` : ""}" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
       <input class="batch-check" type="checkbox" data-action="batch-select-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}">
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
@@ -3250,9 +3350,14 @@ function duplicateExtrasCount(tabs) {
   return extras;
 }
 
-function renderSmartCleanup(tabs) {
+function renderSmartCleanup(tabs, displayTabCount) {
   const card = document.getElementById("smartCleanupCard");
   if (!card) return;
+  if (displayTabCount === 0) {
+    card.style.display = "none";
+    return;
+  }
+  card.style.display = "";
   const duplicates = duplicateExtrasCount(tabs);
   const detail =
     duplicates > 0 ? t("nDuplicateTabsFound", duplicates) : t("noDupes");
@@ -3400,7 +3505,7 @@ function renderStatusView(tabs, favoritedUrls) {
         const safeUrl = escapeHtml(tab.url || "");
         const safeTitle = escapeHtml(label);
         const isFav = favoritedUrls.has(tab.url);
-        const faviconUrl = getFaviconUrl(tab.url, 32);
+        const faviconUrl = getFaviconUrl(tab.url, 64);
         return `<div class="page-chip clickable" data-action="focus-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}" title="${safeTitle}">
         <input class="batch-check" type="checkbox" data-action="batch-select-tab" data-tab-url="${safeUrl}" data-tab-id="${tab.id}">
         ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ""}
@@ -3631,7 +3736,7 @@ async function renderStaticDashboard() {
   const regularDisplayTabs = displayTabs.filter((t) => !t.pinned);
   pinnedDomainGroups = groupTabsByDomain(pinnedDisplayTabs);
   domainGroups = groupTabsByDomain(regularDisplayTabs);
-  renderSmartCleanup(realTabs);
+  renderSmartCleanup(realTabs, displayTabs.length);
   renderDailyPlanner();
 
   // --- Render domain cards ---
@@ -3691,9 +3796,22 @@ async function renderStaticDashboard() {
     openTabsSubSection.style.display = "block";
   } else if (openTabsSubSection) {
     openTabsSubSection.style.display = "none";
-    if (openTabsSectionCount)
-      openTabsSectionCount.textContent = t("nDomains", 0);
+    if (openTabsSectionCount) openTabsSectionCount.textContent = "";
     if (openTabsSectionAction) openTabsSectionAction.innerHTML = "";
+    const emptyMsg =
+      currentLang === "zh"
+        ? "所有标签已关闭，享受宁静。"
+        : "All tabs closed. Enjoy the calm.";
+    const emptyEl = document.getElementById("openTabsEmptyState");
+    if (emptyEl) {
+      emptyEl.style.display = "block";
+      emptyEl.innerHTML = `<p class="tabs-empty-text">${emptyMsg}</p>`;
+    }
+  }
+  // Hide empty state when there are tabs
+  if (regularDisplayTabs.length > 0 || pinnedDisplayTabs.length > 0) {
+    const emptyEl = document.getElementById("openTabsEmptyState");
+    if (emptyEl) emptyEl.style.display = "none";
   }
 
   // --- Footer stats ---
@@ -5115,15 +5233,47 @@ document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = document.getElementById("selectedDayTodoInput");
   const tagInput = document.getElementById("selectedDayTodoTagInput");
-  const ok = await addDailyTask(
-    input && input.value,
-    tagInput && tagInput.value,
-    selectedPlannerDate,
-  );
-  if (!ok) return;
-  input.value = "";
-  input.focus();
-  showToast(t("todoAdded"));
+  const repeatInput = document.getElementById("selectedDayTodoRepeatInput");
+  const title = input && input.value;
+  const tag = tagInput && tagInput.value;
+  const repeat = repeatInput ? repeatInput.value : "";
+
+  if (!repeat) {
+    const ok = await addDailyTask(title, tag, selectedPlannerDate);
+    if (!ok) return;
+    input.value = "";
+    input.focus();
+    showToast(t("todoAdded"));
+    return;
+  }
+
+  // Generate repeating tasks from selected date up to planner max
+  const startDate = parseLocalDateKey(selectedPlannerDate);
+  const maxKey = getPlannerMaxDateKey();
+  let count = 0;
+  const cursor = new Date(startDate);
+  while (toLocalDateKey(cursor) <= maxKey) {
+    const dateKey = toLocalDateKey(cursor);
+    const dayOfWeek = cursor.getDay(); // 0=Sun, 6=Sat
+    let shouldAdd = false;
+    if (repeat === "daily") shouldAdd = true;
+    else if (repeat === "weekdays")
+      shouldAdd = dayOfWeek >= 1 && dayOfWeek <= 5;
+    else if (repeat === "weekly") shouldAdd = true;
+
+    if (shouldAdd && isDateInPlannerRange(dateKey)) {
+      const ok = await addDailyTask(title, tag, dateKey);
+      if (ok) count++;
+    }
+    cursor.setDate(cursor.getDate() + (repeat === "weekly" ? 7 : 1));
+  }
+
+  if (count > 0) {
+    input.value = "";
+    if (repeatInput) repeatInput.value = "";
+    input.focus();
+    showToast(`Added ${count} recurring tasks`);
+  }
 });
 
 // ---- Favorites form submission (handles both add and edit) ----
@@ -5352,9 +5502,13 @@ if (chrome.storage && chrome.storage.onChanged) {
         populateFavoriteSectionInput();
       }
       if (changes.dailyTasks) {
-        dailyTasks = sortDailyTasks(await TabHomeStorage.getDailyTasks());
-        await pruneExpiredDailyTasks();
-        renderDailyPlanner();
+        if (_taskDragReorder) {
+          _taskDragReorder = false;
+        } else {
+          dailyTasks = sortDailyTasks(await TabHomeStorage.getDailyTasks());
+          await pruneExpiredDailyTasks();
+          renderDailyPlanner();
+        }
       }
       if (changes.heroTitle) {
         const heroTitle = document.getElementById("heroTitle");

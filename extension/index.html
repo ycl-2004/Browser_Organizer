@@ -321,6 +321,16 @@
                     <option value="Personal">Personal</option>
                     <option value="Design">Design</option>
                   </select>
+                  <select
+                    id="selectedDayTodoRepeatInput"
+                    aria-label="Repeat"
+                    title="Repeat frequency"
+                  >
+                    <option value="">Once</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekdays">Weekdays</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
                   <button type="submit" aria-label="Add task">+</button>
                 </form>
               </div>
@@ -341,6 +351,8 @@
             </div>
             <div class="section-count" id="openTabsSectionCount"></div>
           </div>
+
+          <div id="openTabsEmptyState" style="display: none"></div>
 
           <!-- Pinned-tabs sub-section — only shown when at least one tab is pinned. -->
           <div
