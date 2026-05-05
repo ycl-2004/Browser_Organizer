@@ -1468,19 +1468,12 @@ function initTaskDragListeners(listEl) {
   listEl.addEventListener("drop", async (e) => {
     e.preventDefault();
     const targetRow = e.target.closest(".daily-task-row");
-    console.log("[DnD] drop fired", {
-      target: e.target.tagName,
-      targetRow: !!targetRow,
-      dragId,
-    });
     if (!targetRow || !dragId) return;
     const targetId = targetRow.dataset.taskId;
-    console.log("[DnD] dragId:", dragId, "targetId:", targetId);
     if (targetId === dragId) return;
 
     const fromIdx = dailyTasks.findIndex((t) => t.id === dragId);
     const toIdx = dailyTasks.findIndex((t) => t.id === targetId);
-    console.log("[DnD] fromIdx:", fromIdx, "toIdx:", toIdx);
     if (fromIdx < 0 || toIdx < 0) return;
 
     const [moved] = dailyTasks.splice(fromIdx, 1);

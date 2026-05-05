@@ -29,7 +29,7 @@ Forked from [tab-out](https://github.com/zarazhangrui/tab-out) by [Zara](https:/
 
 | Feature                 | Description                                                                                                                                                                  |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Unlimited bookmarks** | Organize into named sections; sections can be created, renamed, reordered, and collapsed                                                                                     |
+| **Unlimited bookmarks** | Organize into named sections; sections can be created, renamed, reordered, deleted, and collapsed                                                                            |
 | **Auto favicon**        | Fetches `apple-touch-icon.png` first, falls back to Chrome's cached favicon, then binary-caches the icon as base64 in local storage — zero network requests after first load |
 | **Custom logo**         | Upload an image or paste from clipboard (`Cmd+V`); auto-compressed to 256×256                                                                                                |
 | **Smart naming**        | Leave title blank → auto-extracts brand name from URL (`www.notion.so` → `Notion`)                                                                                           |
@@ -43,8 +43,10 @@ Forked from [tab-out](https://github.com/zarazhangrui/tab-out) by [Zara](https:/
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **Time-of-day greeting**           | Auto-switches between Good morning / Good afternoon / Good evening / Good night                                               |
 | **Editable hero title & subtitle** | Double-click to edit; persists locally and exports with JSON backup                                                           |
-| **Today Task**                     | Quick-add tasks for today; check off or delete; tag with Work / Projects / Personal / Design / Web                            |
+| **Today Task**                     | Quick-add tasks for today; check off or delete; drag to reorder; tag with Work / Projects / Personal / Design                 |
 | **Daily Planner**                  | Month calendar view; click any date to view/add tasks; badge shows task count per day; supports planning up to 365 days ahead |
+| **Recurring tasks**                | When adding a task, choose Once / Daily / Weekdays / Weekly; recurring tasks are generated for all matching dates             |
+| **Overdue carry-forward**          | Undone past tasks auto-move to today with an "OVERDUE" badge; completed past tasks are silently cleaned up                    |
 | **Profile avatar**                 | Upload a local image; compressed and stored in `chrome.storage.local`                                                         |
 | **Weather & location**             | Shows local weather via Open-Meteo (free, no API key); auto-detects city via IP geolocation                                   |
 
@@ -62,7 +64,9 @@ Forked from [tab-out](https://github.com/zarazhangrui/tab-out) by [Zara](https:/
 | **Active sorting**      | Most recently visited domain group floats to top                                                    |
 | **Live sync**           | Tab open/close/switch in other windows auto-refreshes here (debounced 150ms)                        |
 | **Toolbar badge**       | Extension icon shows real tab count; color changes green → amber → red                              |
-| **Smart cleanup**       | Panel at bottom shows duplicate count and status                                                    |
+| **Smart cleanup**       | Panel at bottom shows duplicate count and status; hidden when no tabs are open                      |
+| **Empty state**         | When all tabs are closed, shows a friendly "All clean" message instead of empty lists               |
+| **Self-filtering**      | Browser Organizer's own tab is automatically hidden from the open tabs display                      |
 
 ### Batch Operations
 
@@ -201,7 +205,7 @@ When you first open Browser Organizer, you'll see a clean dashboard with three c
 - **Delete**: Hover → `⋯` → Delete
 - **Custom icon**: In the edit dialog, upload or `Cmd+V` paste an image
 - **Reorder**: Drag cards within a section
-- **Sections**: "Section" button to create; click section name to rename; arrows to reorder; collapse/expand
+- **Sections**: "Section" button to create; click section name to rename; arrows to reorder; collapse/expand; delete (favorites move to default section)
 
 ### Tab Status Tags
 
@@ -234,10 +238,13 @@ When you first open Browser Organizer, you'll see a clean dashboard with three c
 
 ### Daily Planner
 
-- **Add task**: Type in the input field at the bottom, choose a tag, press Enter or click `+`
-- **Tags**: Work, Projects, Personal, Design, Web (auto-assigned when adding from tab)
+- **Add task**: Type in the input field at the bottom, choose a tag and repeat frequency, press Enter or click `+`
+- **Repeat**: Choose Once (default), Daily, Weekdays, or Weekly — recurring tasks are auto-generated for all matching dates
+- **Tags**: Work, Projects, Personal, Design (auto-assigned when adding from tab)
+- **Reorder**: Drag tasks by the handle (⠿) to rearrange; order persists
 - **Complete**: Click the checkbox to mark done
 - **Delete**: Click the `✕` next to a task
+- **Overdue**: Past undone tasks automatically move to today with an "OVERDUE" badge; completed past tasks are cleaned up
 - **Calendar**: Click any date to view/add tasks for that day; dates with tasks show a count badge
 
 ### Command Bar
@@ -292,8 +299,8 @@ All data starts empty. The extension is ready to use immediately — no setup, n
 extension/
 ├── manifest.json      # Chrome MV3 manifest
 ├── index.html         # New tab page (single HTML file)
-├── app.js             # All application logic (~5000 lines)
-├── style.css          # All styles (~3800 lines)
+├── app.js             # All application logic (~5500 lines)
+├── style.css          # All styles (~4000 lines)
 ├── storage.js         # Storage abstraction layer (chrome.storage.local)
 ├── background.js      # Service worker: badge count, right-click menu, Google Suggest proxy
 ├── config.local.js    # Optional local overrides (gitignored)
@@ -340,18 +347,18 @@ Open new tab
 
 All data is stored in `chrome.storage.local`. Each Chrome profile has its own independent storage.
 
-| Key                   | Type     | Description                                                                                |
-| --------------------- | -------- | ------------------------------------------------------------------------------------------ |
-| `favorites`           | `Array`  | Bookmarks. Each: `{ id, url, title, slot, sectionId, sectionSlot, iconUrl?, customLogo? }` |
-| `favoriteSections`    | `Array`  | Sections. Each: `{ id, name, order, collapsed }`                                           |
-| `dailyTasks`          | `Array`  | Tasks. Each: `{ id, title, tag, date, done, createdAt, updatedAt }`                        |
-| `tabStatuses`         | `Object` | Map of `{ [url]: "later" \| "important" }` — persists tab status tags                      |
-| `savedSessions`       | `Array`  | Sessions. Each: `{ id, name, createdAt, tabs: [{ url, title }] }`                          |
-| `heroTitle`           | `String` | Custom hero title (empty = use default)                                                    |
-| `heroCopy`            | `String` | Custom hero subtitle (empty = use default)                                                 |
-| `theme`               | `String` | `"light"` / `"dark"` / `"pink"` / `"lavender"` / `"sky"` / `"sand"`                        |
-| `lang`                | `String` | `"en"` or `"zh"`                                                                           |
-| `profileImageDataUrl` | `String` | Avatar as base64 data URL                                                                  |
+| Key                   | Type     | Description                                                                                  |
+| --------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `favorites`           | `Array`  | Bookmarks. Each: `{ id, url, title, slot, sectionId, sectionSlot, iconUrl?, customLogo? }`   |
+| `favoriteSections`    | `Array`  | Sections. Each: `{ id, name, order, collapsed }`                                             |
+| `dailyTasks`          | `Array`  | Tasks. Each: `{ id, title, tag, date, done, createdAt, updatedAt, overdue?, originalDate? }` |
+| `tabStatuses`         | `Object` | Map of `{ [url]: "later" \| "important" }` — persists tab status tags                        |
+| `savedSessions`       | `Array`  | Sessions. Each: `{ id, name, createdAt, tabs: [{ url, title }] }`                            |
+| `heroTitle`           | `String` | Custom hero title (empty = use default)                                                      |
+| `heroCopy`            | `String` | Custom hero subtitle (empty = use default)                                                   |
+| `theme`               | `String` | `"light"` / `"dark"` / `"pink"` / `"lavender"` / `"sky"` / `"sand"`                          |
+| `lang`                | `String` | `"en"` or `"zh"`                                                                             |
+| `profileImageDataUrl` | `String` | Avatar as base64 data URL                                                                    |
 
 ### Privacy
 
