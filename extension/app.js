@@ -907,6 +907,20 @@ async function toggleFavoriteSection(id) {
   await setFavoriteSections(sections);
 }
 
+async function deleteFavoriteSection(id) {
+  if (!id || id === "default") return;
+  const sections = await getFavoriteSections();
+  if (!sections.find((s) => s.id === id)) return;
+  const favorites = await getFavorites();
+  for (const fav of favorites) {
+    if (fav.sectionId === id) {
+      fav.sectionId = "default";
+    }
+  }
+  await setFavorites(favorites);
+  await setFavoriteSections(sections.filter((s) => s.id !== id));
+}
+
 async function moveFavoriteSection(id, dir) {
   const sections = (await getFavoriteSections()).sort(
     (a, b) => a.order - b.order,
@@ -3024,7 +3038,12 @@ function renderFavoriteSection(section, favorites) {
         <div class="favorite-section-actions">
           <button data-action="move-favorite-section" data-section-id="${section.id}" data-dir="-1" title="Move up">\u2191</button>
           <button data-action="move-favorite-section" data-section-id="${section.id}" data-dir="1" title="Move down">\u2193</button>
-          <button data-action="rename-favorite-section" data-section-id="${section.id}" title="${t("edit")}">${t("edit")}</button>
+          <button data-action="rename-favorite-section" data-section-id="${section.id}" title="${t("edit")}">${t("edit")}</button>${
+            section.id !== "default"
+              ? `
+          <button data-action="delete-favorite-section" data-section-id="${section.id}" title="Delete section">\u2715</button>`
+              : ""
+          }
           <button data-action="add-favorite-to-section" data-section-id="${section.id}" title="${t("addAFavorite")}">+</button>
         </div>
       </div>
@@ -3872,6 +3891,27 @@ document.addEventListener("click", async (e) => {
       await populateFavoriteSectionInput(section.id);
       showToast(t("sectionAdded"));
     }
+    return;
+  }
+
+  if (action === "delete-favorite-section") {
+    const id = actionEl.dataset.sectionId;
+    if (!id || id === "default") return;
+    const sections = await getFavoriteSections();
+    const section = sections.find((s) => s.id === id);
+    if (!section) return;
+    const favorites = await getFavorites();
+    const count = favorites.filter((f) => f.sectionId === id).length;
+    const msg =
+      count > 0
+        ? `Delete section "${section.name}"? Its ${count} favorite(s) will be moved to the default section.`
+        : `Delete section "${section.name}"?`;
+    const ok = await showConfirm({ message: msg, okLabel: "Delete" });
+    if (!ok) return;
+    await deleteFavoriteSection(id);
+    await renderFavoritesColumn();
+    await populateFavoriteSectionInput();
+    showToast(`Section "${section.name}" deleted`);
     return;
   }
 
