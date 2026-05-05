@@ -4516,6 +4516,122 @@ function commandTargetFromInput(value) {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 
+/* ----------------------------------------------------------------
+   COMMAND BAR — Google Search Autocomplete
+   ---------------------------------------------------------------- */
+(function initSearchSuggestions() {
+  const input = document.getElementById("commandInput");
+  const box = document.getElementById("searchSuggestions");
+  if (!input || !box) return;
+
+  const ICON_SEARCH = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>`;
+
+  let debounceTimer = null;
+  let activeIndex = -1;
+  let currentSuggestions = [];
+
+  function openSuggestions(items) {
+    currentSuggestions = items;
+    activeIndex = -1;
+    if (!items.length) {
+      closeSuggestions();
+      return;
+    }
+    box.innerHTML = items
+      .map(
+        (s, i) =>
+          `<div class="suggestion-item" data-index="${i}">` +
+          `<span class="suggestion-icon">${ICON_SEARCH}</span>` +
+          `<span class="suggestion-text">${escapeHtml(s)}</span>` +
+          `</div>`,
+      )
+      .join("");
+    box.classList.add("is-open");
+  }
+
+  function closeSuggestions() {
+    box.classList.remove("is-open");
+    box.innerHTML = "";
+    activeIndex = -1;
+    currentSuggestions = [];
+  }
+
+  function setActive(idx) {
+    const items = box.querySelectorAll(".suggestion-item");
+    items.forEach((el) => el.classList.remove("is-active"));
+    if (idx >= 0 && idx < items.length) {
+      items[idx].classList.add("is-active");
+      activeIndex = idx;
+    } else {
+      activeIndex = -1;
+    }
+  }
+
+  function navigateToSuggestion(text) {
+    closeSuggestions();
+    window.location.href = `https://www.google.com/search?q=${encodeURIComponent(text)}`;
+  }
+
+  input.addEventListener("input", () => {
+    const q = input.value.trim();
+    clearTimeout(debounceTimer);
+    if (!q) {
+      closeSuggestions();
+      return;
+    }
+    debounceTimer = setTimeout(async () => {
+      try {
+        const resp = await chrome.runtime.sendMessage({
+          type: "fetch-suggestions",
+          query: q,
+        });
+        if (input.value.trim() === q) openSuggestions(resp.suggestions || []);
+      } catch {
+        /* ignore */
+      }
+    }, 180);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (!box.classList.contains("is-open")) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive(Math.min(activeIndex + 1, currentSuggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive(Math.max(activeIndex - 1, -1));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      navigateToSuggestion(currentSuggestions[activeIndex]);
+    } else if (e.key === "Escape") {
+      closeSuggestions();
+    }
+  });
+
+  input.addEventListener("focus", () => {
+    const q = input.value.trim();
+    if (!q || box.classList.contains("is-open")) return;
+    chrome.runtime
+      .sendMessage({ type: "fetch-suggestions", query: q })
+      .then((resp) => {
+        if (input.value.trim() === q) openSuggestions(resp.suggestions || []);
+      })
+      .catch(() => {});
+  });
+
+  input.addEventListener("blur", () => {
+    setTimeout(closeSuggestions, 150);
+  });
+
+  box.addEventListener("mousedown", (e) => {
+    const item = e.target.closest(".suggestion-item");
+    if (!item) return;
+    e.preventDefault();
+    navigateToSuggestion(currentSuggestions[Number(item.dataset.index)]);
+  });
+})();
+
 document.addEventListener("submit", (e) => {
   if (e.target.id !== "commandForm") return;
   e.preventDefault();

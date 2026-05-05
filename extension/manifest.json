@@ -14,7 +14,7 @@
   ],
   "host_permissions": ["<all_urls>"],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://ipapi.co https://get.geojs.io https://api.open-meteo.com;"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://ipapi.co https://get.geojs.io https://api.open-meteo.com https://suggestqueries.google.com;"
   },
   "chrome_url_overrides": { "newtab": "index.html" },
   "background": { "service_worker": "background.js" },

@@ -1763,6 +1763,7 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
 
 .command-bar {
   min-width: 0;
+  position: relative;
 }
 
 .command-bar input {
@@ -1792,7 +1793,63 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
 
 .command-bar input:focus {
   border-color: var(--accent-amber);
-  box-shadow: 0 0 0 3px rgba(200, 113, 58, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-amber) 12%, transparent);
+}
+
+/* ---- Search Suggestions Dropdown ---- */
+.search-suggestions {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--accent-amber);
+  border-top: none;
+  z-index: 500;
+  box-shadow: 0 6px 18px var(--shadow);
+  overflow: hidden;
+}
+
+.search-suggestions.is-open {
+  display: block;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ink);
+  transition: background 0.1s ease;
+  user-select: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.is-active {
+  background: var(--hover-bg);
+}
+
+.suggestion-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.suggestion-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.suggestion-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar-actions {

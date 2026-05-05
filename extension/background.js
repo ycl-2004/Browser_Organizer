@@ -208,6 +208,32 @@ async function fetchGeoLocation() {
   };
 }
 
+// ─── Search suggestions proxy ──────────────────────────────────────────────
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type !== "fetch-suggestions") return false;
+  const q = (message.query || "").trim();
+  if (!q) {
+    sendResponse({ suggestions: [] });
+    return true;
+  }
+  (async () => {
+    try {
+      const url =
+        `https://suggestqueries.google.com/complete/search` +
+        `?output=firefox&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      // Response: ["query", ["sug1","sug2",...], ...]
+      const suggestions = Array.isArray(data[1]) ? data[1].slice(0, 8) : [];
+      sendResponse({ suggestions });
+    } catch {
+      sendResponse({ suggestions: [] });
+    }
+  })();
+  return true;
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type !== "fetch-weather") return false;
   (async () => {
