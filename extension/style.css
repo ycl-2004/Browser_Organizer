@@ -2144,7 +2144,7 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
   position: absolute;
   z-index: 0;
   right: -28px;
-  bottom: 10px;
+  bottom: -1px;
   width: 116px;
   height: 116px;
   border-radius: 999px 0 0 0;
@@ -2505,26 +2505,54 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   padding: var(--sp-2) 0;
 }
 
-.session-card {
-  background: var(--card-bg);
-  border: var(--border-subtle);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--sp-2);
-  overflow: hidden;
+.session-row-item {
+  border-bottom: 1px solid rgba(154, 145, 138, 0.08);
+}
+
+.session-row-item:last-child {
+  border-bottom: none;
 }
 
 .session-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) 0;
   gap: var(--sp-2);
   cursor: pointer;
   transition: background var(--duration-fast);
+  border-radius: var(--radius-sm);
 }
 
 .session-row:hover {
   background: var(--hover-bg);
+}
+
+.session-favicons {
+  display: flex;
+  align-items: center;
+  gap: -2px;
+  flex-shrink: 0;
+}
+
+.session-favicon-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  margin-right: -3px;
+  border: 1px solid var(--card-bg);
+  background: var(--warm-gray);
+  flex-shrink: 0;
+}
+
+.session-favicon-placeholder {
+  background: var(--warm-gray);
+}
+
+.session-favicon-more {
+  font-size: 9px;
+  color: var(--muted);
+  margin-left: 6px;
+  white-space: nowrap;
 }
 
 .session-preview {
@@ -3095,6 +3123,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   font-size: var(--text-xl);
   font-weight: 500;
   letter-spacing: -0.3px;
+  line-height: 1.15;
 }
 
 .todo-panel .eyebrow {
@@ -3320,7 +3349,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 
 .todo-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 52px 52px 30px;
+  grid-template-columns: minmax(0, 1fr) 64px 64px 30px;
   gap: var(--sp-2);
   align-items: center;
   padding: var(--sp-3) 0 0;
@@ -3345,13 +3374,15 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
 
 .todo-form select {
   font-size: var(--text-xs);
-  padding-left: 2px;
+  padding-left: var(--sp-2);
   -webkit-appearance: none;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%239a918a' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 2px center;
-  padding-right: 12px;
+  background-position: right 4px center;
+  padding-right: 14px;
+  text-align: center;
+  text-align-last: center;
 }
 
 .todo-form input:focus,
@@ -3629,9 +3660,34 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   cursor: pointer;
 }
 
+.cleanup-actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
 .review-duplicates-btn:hover {
   border-color: var(--accent-amber);
   color: var(--accent-amber);
+}
+
+.cleanup-close-btn {
+  flex: 0 0 auto;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent-amber);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 0 var(--sp-3);
+  cursor: pointer;
+  transition: opacity var(--duration-fast);
+}
+
+.cleanup-close-btn:hover {
+  opacity: 0.85;
 }
 
 .hero-section {
@@ -3926,7 +3982,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   }
 
   .todo-form {
-    grid-template-columns: minmax(0, 1fr) 50px 50px 30px;
+    grid-template-columns: minmax(0, 1fr) 60px 60px 30px;
   }
 }
 
@@ -4004,7 +4060,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   }
 
   .todo-form {
-    grid-template-columns: minmax(0, 1fr) 48px 48px 22px;
+    grid-template-columns: minmax(0, 1fr) 56px 56px 22px;
   }
 
   .todo-list-compact {
@@ -4043,7 +4099,7 @@ body.dragging-favorite .favorites-column .favorite-slot-empty {
   }
 
   .todo-form {
-    grid-template-columns: minmax(0, 1fr) 46px 46px 22px;
+    grid-template-columns: minmax(0, 1fr) 54px 54px 22px;
     gap: 4px;
   }
 

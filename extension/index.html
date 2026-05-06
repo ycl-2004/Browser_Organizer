@@ -622,7 +622,17 @@
     <!-- Shared storage helpers: local-only UI state plus JSON backup / restore -->
     <script src="storage.js"></script>
 
-    <!-- Main dashboard logic — loads last so the DOM is ready -->
+    <!-- Modular scripts — loaded in dependency order before app.js -->
+    <script src="i18n.js"></script>
+    <script src="theme.js"></script>
+    <script src="tabs.js"></script>
+    <script src="helpers.js"></script>
+    <script src="favorites.js"></script>
+    <script src="planner.js"></script>
+    <script src="hero.js"></script>
+    <script src="backup.js"></script>
+
+    <!-- Main dashboard logic — renders UI, events, drag-and-drop, init -->
     <script src="app.js"></script>
   </body>
 </html>
