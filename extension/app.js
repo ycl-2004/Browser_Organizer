@@ -1270,10 +1270,17 @@ function renderTodayTasks() {
   if (!list || !count) return;
 
   const todayTasks = getTodayTasks();
+  const total = todayTasks.length;
+  const done = todayTasks.filter((t) => t.done).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
 
-  count.textContent = String(todayTasks.length);
+  count.innerHTML = `<div class="todo-progress">
+    <div class="todo-progress-bar"><div class="todo-progress-fill" style="width:${pct}%"></div></div>
+    <span class="todo-progress-text">${done} <span>/ ${total}</span></span>
+  </div>`;
 
-  if (!todayTasks.length) {
+  if (!total) {
+    count.innerHTML = "";
     list.innerHTML = `<div class="todo-empty">${t("todoEmpty")}</div>`;
     return;
   }
@@ -3090,7 +3097,7 @@ function renderFavoriteItem(fav) {
 
   let imgHtml = "";
   if (fav.customLogo) {
-    imgHtml = `<img class="favorite-favicon" src="${fav.customLogo}" alt="">`;
+    imgHtml = `<img class="favorite-favicon" src="${fav.customLogo}" draggable="false" alt="">`;
   } else if (fav.iconUrl) {
     // Already resolved. Data URLs are real binary caches — mark resolved so
     // we never re-download. Plain URL strings (legacy) get rendered but left
@@ -3098,24 +3105,24 @@ function renderFavoriteItem(fav) {
     const safe = fav.iconUrl.replace(/"/g, "&quot;");
     const isBinary = fav.iconUrl.startsWith("data:");
     const resolved = isBinary ? 'data-resolved="1"' : "";
-    imgHtml = `<img class="favorite-favicon" src="${safe}" data-fav-id="${fav.id}" ${resolved} alt="">`;
+    imgHtml = `<img class="favorite-favicon" src="${safe}" data-fav-id="${fav.id}" ${resolved} draggable="false" alt="">`;
   } else {
     const chain = getFaviconFallbackChain(fav.url, 128);
     if (chain.length > 0) {
       const primary = chain[0].replace(/"/g, "&quot;");
       const fallback = chain.slice(1).join("|").replace(/"/g, "&quot;");
-      imgHtml = `<img class="favorite-favicon" src="${primary}" data-fallback="${fallback}" data-fav-id="${fav.id}" alt="">`;
+      imgHtml = `<img class="favorite-favicon" src="${primary}" data-fallback="${fallback}" data-fav-id="${fav.id}" draggable="false" alt="">`;
     }
   }
 
   return `
-    <a class="favorite-item" href="${safeUrl}" target="_blank" rel="noopener noreferrer" draggable="true" data-fav-id="${fav.id}" data-section-id="${sectionId}" data-slot="${sectionSlot}" title="${safeUrl}">
+    <div class="favorite-item" data-fav-id="${fav.id}" data-fav-url="${safeUrl}" data-section-id="${sectionId}" data-slot="${sectionSlot}" title="${safeUrl}" role="link" tabindex="0">
       ${imgHtml}
       <span class="favorite-title">${safeTitle}</span>
       <button class="favorite-menu" data-action="favorite-menu" data-fav-id="${fav.id}" title="${t("moreActions")}">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
       </button>
-    </a>`;
+    </div>`;
 }
 
 async function renderFavoritesColumn() {
@@ -3147,23 +3154,16 @@ function renderFavoriteSection(section, favorites) {
         typeof b.sectionSlot === "number" ? b.sectionSlot : b.slot || 0;
       return aSlot - bSlot;
     });
-  const bySlot = new Map();
-  let maxSlot = -1;
-  for (const item of sectionItems) {
-    const slot =
-      typeof item.sectionSlot === "number" ? item.sectionSlot : item.slot || 0;
-    bySlot.set(slot, item);
-    if (slot > maxSlot) maxSlot = slot;
-  }
 
-  const totalSlots = Math.max(maxSlot + 2, sectionItems.length === 0 ? 1 : 0);
+  // Render items in sorted order with contiguous indices.
+  // Only append ONE hidden empty slot (for drag-drop targets).
   let row = "";
-  for (let i = 0; i < totalSlots; i++) {
-    const item = bySlot.get(i);
-    row += item
-      ? renderFavoriteItem(item)
-      : `<div class="favorite-slot-empty" data-section-id="${section.id}" data-slot="${i}"></div>`;
+  for (let i = 0; i < sectionItems.length; i++) {
+    row += renderFavoriteItem(sectionItems[i]);
   }
+  // Single empty drop slot at the end (hidden by default, shown during drag)
+  const nextSlot = sectionItems.length;
+  row += `<div class="favorite-slot-empty" data-section-id="${section.id}" data-slot="${nextSlot}"></div>`;
 
   return `
     <section class="favorite-section${section.collapsed ? " is-collapsed" : ""}" data-section-id="${section.id}">
@@ -5453,19 +5453,20 @@ document.addEventListener("submit", async (e) => {
 });
 
 /* ----------------------------------------------------------------
-   FAVORITES DRAG-AND-DROP — reorder cards within the favorites column.
+   FAVORITES DRAG-AND-DROP — pointer-event-based reorder.
 
-   Scope: strictly limited to the favorites column. Drops elsewhere on
-   the page (including the OpenTabs section) are ignored. This is
-   intentional — dragging onto OpenTabs used to "open as new tab", but
-   that feature was confusing and got removed.
+   Uses mousedown/mousemove/mouseup instead of HTML5 drag-and-drop to
+   work around Chrome's broken native drag inside overflow:auto containers.
 
+   Scope: strictly limited to the favorites column.
    Drop targets:
      - another card        → swap slots
      - empty slot          → place there
      - anywhere else       → no-op
    ---------------------------------------------------------------- */
-let _draggedFavId = null;
+let _dragState = null; // { id, el, startX, startY, started }
+let _suppressNextClick = false;
+const DRAG_THRESHOLD = 5; // px before committing to drag
 
 function clearDropMarkers() {
   document
@@ -5475,96 +5476,159 @@ function clearDropMarkers() {
     .forEach((el) => el.classList.remove("drop-target"));
 }
 
-document.addEventListener("dragstart", (e) => {
+function getDropTarget(x, y, draggedId) {
+  const els = document.elementsFromPoint(x, y);
+  for (const el of els) {
+    const card = el.closest(".favorite-item");
+    if (card && card.dataset.favId && card.dataset.favId !== draggedId) {
+      return { type: "card", el: card };
+    }
+    const slot = el.closest(".favorite-slot-empty");
+    if (slot) return { type: "slot", el: slot };
+  }
+  return null;
+}
+
+document.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
   const item = e.target.closest(".favorite-item");
   if (!item) return;
-  _draggedFavId = item.dataset.favId;
-  item.classList.add("dragging");
-  document.body.classList.add("dragging-favorite");
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("text/plain", _draggedFavId);
+  if (e.target.closest(".favorite-menu")) return;
+  _dragState = {
+    id: item.dataset.favId,
+    el: item,
+    startX: e.clientX,
+    startY: e.clientY,
+    started: false,
+  };
 });
 
-document.addEventListener("dragend", () => {
+document.addEventListener("mousemove", (e) => {
+  if (!_dragState) return;
+  const dx = e.clientX - _dragState.startX;
+  const dy = e.clientY - _dragState.startY;
+
+  if (!_dragState.started) {
+    if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
+    _dragState.started = true;
+    _dragState.el.classList.add("dragging");
+    document.body.classList.add("dragging-favorite");
+  }
+
+  clearDropMarkers();
+  const target = getDropTarget(e.clientX, e.clientY, _dragState.id);
+  if (target) target.el.classList.add("drop-target");
+});
+
+document.addEventListener("mouseup", async (e) => {
+  if (!_dragState) return;
+  const { id: draggedId, started } = _dragState;
+  _dragState = null;
+
+  if (!started) return; // was a click, not a drag
+
+  _suppressNextClick = true;
+
+  // Capture target BEFORE removing dragging class (which changes body class)
+  const target = getDropTarget(e.clientX, e.clientY, draggedId);
+  console.log(
+    "[drag] mouseup — draggedId:",
+    draggedId,
+    "target:",
+    target?.type,
+    target?.el?.dataset,
+  );
+
   document
     .querySelectorAll(".favorite-item.dragging")
     .forEach((el) => el.classList.remove("dragging"));
   document.body.classList.remove("dragging-favorite");
   clearDropMarkers();
-  _draggedFavId = null;
-});
 
-document.addEventListener("dragover", (e) => {
-  if (!_draggedFavId) return;
+  if (!target) return;
 
-  // Hovering another card → reorder (swap slots on drop)
-  const card = e.target.closest(".favorite-item");
-  if (card && card.dataset.favId && card.dataset.favId !== _draggedFavId) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    clearDropMarkers();
-    card.classList.add("drop-target");
-    return;
-  }
-
-  // Hovering an empty slot → place there
-  const slot = e.target.closest(".favorite-slot-empty");
-  if (slot) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    clearDropMarkers();
-    slot.classList.add("drop-target");
-  }
-  // No third branch — drops outside the favorites grid are not allowed.
-});
-
-document.addEventListener("drop", async (e) => {
-  if (!_draggedFavId) return;
-  const draggedId = _draggedFavId;
-  _draggedFavId = null;
-
-  // Drop on another card → swap slots
-  const card = e.target.closest(".favorite-item");
-  if (card && card.dataset.favId && card.dataset.favId !== draggedId) {
-    e.preventDefault();
-    clearDropMarkers();
+  if (target.type === "card") {
     const favorites = await getFavorites();
     const a = favorites.find((f) => f.id === draggedId);
-    const b = favorites.find((f) => f.id === card.dataset.favId);
+    const b = favorites.find((f) => f.id === target.el.dataset.favId);
     if (a && b) {
-      const aSectionId = a.sectionId || "default";
-      const bSectionId = b.sectionId || "default";
-      const aSectionSlot =
+      // Swap: exchange section + slot between a and b
+      const aSec = a.sectionId || "default";
+      const bSec = b.sectionId || "default";
+      const aSlot =
         typeof a.sectionSlot === "number" ? a.sectionSlot : a.slot || 0;
-      const bSectionSlot =
+      const bSlot =
         typeof b.sectionSlot === "number" ? b.sectionSlot : b.slot || 0;
-      a.sectionId = bSectionId;
-      a.sectionSlot = bSectionSlot;
-      a.slot = bSectionSlot;
-      b.sectionId = aSectionId;
-      b.sectionSlot = aSectionSlot;
-      b.slot = aSectionSlot;
+      a.sectionId = bSec;
+      a.sectionSlot = bSlot;
+      a.slot = bSlot;
+      b.sectionId = aSec;
+      b.sectionSlot = aSlot;
+      b.slot = aSlot;
+      // Normalize both affected sections to contiguous 0..n-1
+      normalizeSectionSlots(favorites, aSec);
+      if (bSec !== aSec) normalizeSectionSlots(favorites, bSec);
       await setFavorites(favorites);
       await renderFavoritesColumn();
     }
     return;
   }
 
-  // Drop on an empty slot → set slot
-  const slot = e.target.closest(".favorite-slot-empty");
-  if (slot) {
-    e.preventDefault();
-    clearDropMarkers();
-    const newSlot = parseInt(slot.dataset.slot, 10);
-    const sectionId = slot.dataset.sectionId || "default";
-    if (!Number.isNaN(newSlot)) {
-      await setFavoriteSlot(draggedId, newSlot, sectionId);
+  if (target.type === "slot") {
+    const sectionId = target.el.dataset.sectionId || "default";
+    const favorites = await getFavorites();
+    const fav = favorites.find((f) => f.id === draggedId);
+    if (fav) {
+      const oldSec = fav.sectionId || "default";
+      // Move to end of target section
+      const sectionItems = favorites.filter(
+        (f) => f.id !== draggedId && (f.sectionId || "default") === sectionId,
+      );
+      fav.sectionId = sectionId;
+      fav.sectionSlot = sectionItems.length;
+      fav.slot = sectionItems.length;
+      // Normalize both sections
+      normalizeSectionSlots(favorites, oldSec);
+      normalizeSectionSlots(favorites, sectionId);
+      await setFavorites(favorites);
       await renderFavoritesColumn();
     }
+  }
+});
+
+/** Re-index all items in a section to contiguous 0..n-1 slots. */
+function normalizeSectionSlots(favorites, sectionId) {
+  const items = favorites
+    .filter((f) => (f.sectionId || "default") === sectionId)
+    .sort((a, b) => {
+      const aS =
+        typeof a.sectionSlot === "number" ? a.sectionSlot : a.slot || 0;
+      const bS =
+        typeof b.sectionSlot === "number" ? b.sectionSlot : b.slot || 0;
+      return aS - bS;
+    });
+  items.forEach((item, i) => {
+    item.sectionSlot = i;
+    item.slot = i;
+  });
+}
+
+/* Navigate to a favorite when its card is clicked (now <div> instead of <a>
+   to avoid Chrome's broken drag-and-drop for <a> in scrollable containers). */
+document.addEventListener("click", (e) => {
+  const item = e.target.closest(".favorite-item");
+  if (!item) return;
+  // Don't navigate if clicking the 3-dot menu button
+  if (e.target.closest(".favorite-menu")) return;
+  // Don't navigate if we just finished a drag
+  if (_suppressNextClick) {
+    _suppressNextClick = false;
     return;
   }
-
-  clearDropMarkers();
+  const url = item.dataset.favUrl;
+  if (url) {
+    chrome.tabs.create({ url });
+  }
 });
 
 /* ----------------------------------------------------------------
