@@ -2305,11 +2305,13 @@ function getHeroGreeting() {
     if (hour < 5) return "夜深了";
     if (hour < 12) return "早上好";
     if (hour < 18) return "下午好";
-    return "晚上好";
+    if (hour < 22) return "晚上好";
+    return "夜深了";
   }
   if (hour < 5) return "Good night";
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
+  if (hour < 22) return "Good evening";
   return "Good night";
 }
 
@@ -5256,7 +5258,9 @@ function commandTargetFromInput(value) {
 
   function navigateToSuggestion(text) {
     closeSuggestions();
-    window.location.href = `https://www.google.com/search?q=${encodeURIComponent(text)}`;
+    chrome.tabs.create({
+      url: `https://www.google.com/search?q=${encodeURIComponent(text)}`,
+    });
   }
 
   input.addEventListener("input", () => {
@@ -5324,7 +5328,7 @@ document.addEventListener("submit", (e) => {
   e.preventDefault();
   const input = document.getElementById("commandInput");
   const target = commandTargetFromInput(input && input.value);
-  if (target) window.location.href = target;
+  if (target) chrome.tabs.create({ url: target });
 });
 
 document.addEventListener("submit", async (e) => {
