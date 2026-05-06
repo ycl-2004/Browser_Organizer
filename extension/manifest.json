@@ -10,7 +10,8 @@
     "contextMenus",
     "favicon",
     "bookmarks",
-    "readingList"
+    "readingList",
+    "history"
   ],
   "host_permissions": ["<all_urls>"],
   "content_security_policy": {

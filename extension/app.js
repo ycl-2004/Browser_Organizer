@@ -2518,27 +2518,37 @@ function commandTargetFromInput(value) {
   if (!input || !box) return;
 
   const ICON_SEARCH = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>`;
+  const ICON_HISTORY = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`;
+  const ICON_TAB = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>`;
 
-  let debounceTimer = null;
+  let debounceTimer;
+  let blurTimer;
   let activeIndex = -1;
-  let currentSuggestions = [];
+  // Each item: { text, url?, icon }
+  let currentItems = [];
+
+  function renderSuggestionItem(item, i) {
+    const icon = item.icon || ICON_SEARCH;
+    const label = escapeHtml(item.text);
+    const subtitle = item.subtitle
+      ? `<span class="suggestion-sub">${escapeHtml(item.subtitle)}</span>`
+      : "";
+    return (
+      `<div class="suggestion-item" data-index="${i}">` +
+      `<span class="suggestion-icon">${icon}</span>` +
+      `<span class="suggestion-text">${label}${subtitle}</span>` +
+      `</div>`
+    );
+  }
 
   function openSuggestions(items) {
-    currentSuggestions = items;
+    currentItems = items;
     activeIndex = -1;
     if (!items.length) {
       closeSuggestions();
       return;
     }
-    box.innerHTML = items
-      .map(
-        (s, i) =>
-          `<div class="suggestion-item" data-index="${i}">` +
-          `<span class="suggestion-icon">${ICON_SEARCH}</span>` +
-          `<span class="suggestion-text">${escapeHtml(s)}</span>` +
-          `</div>`,
-      )
-      .join("");
+    box.innerHTML = items.map(renderSuggestionItem).join("");
     box.classList.add("is-open");
   }
 
@@ -2546,7 +2556,7 @@ function commandTargetFromInput(value) {
     box.classList.remove("is-open");
     box.innerHTML = "";
     activeIndex = -1;
-    currentSuggestions = [];
+    currentItems = [];
   }
 
   function setActive(idx) {
@@ -2560,18 +2570,88 @@ function commandTargetFromInput(value) {
     }
   }
 
-  function navigateToSuggestion(text) {
+  function navigateToItem(item) {
     closeSuggestions();
-    chrome.tabs.create({
-      url: `https://www.google.com/search?q=${encodeURIComponent(text)}`,
-    });
+    if (item.url) {
+      // Direct URL — open it
+      chrome.tabs.create({ url: item.url });
+    } else {
+      // Search query — go to Google
+      chrome.tabs.create({
+        url: `https://www.google.com/search?q=${encodeURIComponent(item.text)}`,
+      });
+    }
+  }
+
+  /** Build quick-access items from recent history + open tabs (no query needed) */
+  async function getQuickSuggestions() {
+    const items = [];
+    const seen = new Set();
+
+    // Recent history (last 7 days, top 6)
+    if (chrome.history && chrome.history.search) {
+      try {
+        const history = await chrome.history.search({
+          text: "",
+          maxResults: 20,
+          startTime: Date.now() - 7 * 24 * 60 * 60 * 1000,
+        });
+        for (const h of history) {
+          if (
+            !h.url ||
+            h.url.startsWith("chrome://") ||
+            h.url.startsWith("chrome-extension://")
+          )
+            continue;
+          if (seen.has(h.url)) continue;
+          seen.add(h.url);
+          const title = h.title || friendlyDomain(h.url);
+          items.push({
+            text: title,
+            subtitle: friendlyDomain(h.url),
+            url: h.url,
+            icon: ICON_HISTORY,
+          });
+          if (items.length >= 6) break;
+        }
+      } catch {
+        /* history API might fail */
+      }
+    }
+
+    // Open tabs (top 4 that aren't already listed)
+    const tabs = openTabs
+      .filter((tab) => {
+        if (
+          !tab.url ||
+          tab.url.startsWith("chrome://") ||
+          tab.url.startsWith("chrome-extension://")
+        )
+          return false;
+        return !seen.has(tab.url);
+      })
+      .slice(0, 4);
+    for (const tab of tabs) {
+      const title = tab.title || friendlyDomain(tab.url);
+      items.push({
+        text: title,
+        subtitle: friendlyDomain(tab.url),
+        url: tab.url,
+        icon: ICON_TAB,
+      });
+    }
+
+    return items;
   }
 
   input.addEventListener("input", () => {
     const q = input.value.trim();
     clearTimeout(debounceTimer);
     if (!q) {
-      closeSuggestions();
+      // Show quick suggestions (history + tabs) when input is cleared
+      getQuickSuggestions()
+        .then(openSuggestions)
+        .catch(() => {});
       return;
     }
     debounceTimer = setTimeout(async () => {
@@ -2580,7 +2660,13 @@ function commandTargetFromInput(value) {
           type: "fetch-suggestions",
           query: q,
         });
-        if (input.value.trim() === q) openSuggestions(resp.suggestions || []);
+        if (input.value.trim() === q) {
+          const items = (resp.suggestions || []).map((s) => ({
+            text: s,
+            icon: ICON_SEARCH,
+          }));
+          openSuggestions(items);
+        }
       } catch {
         /* ignore */
       }
@@ -2591,39 +2677,60 @@ function commandTargetFromInput(value) {
     if (!box.classList.contains("is-open")) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive(Math.min(activeIndex + 1, currentSuggestions.length - 1));
+      setActive(Math.min(activeIndex + 1, currentItems.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive(Math.max(activeIndex - 1, -1));
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
       e.stopImmediatePropagation();
-      navigateToSuggestion(currentSuggestions[activeIndex]);
+      navigateToItem(currentItems[activeIndex]);
     } else if (e.key === "Escape") {
       closeSuggestions();
     }
   });
 
   input.addEventListener("focus", () => {
+    // Cancel any pending blur-close so re-focus keeps suggestions alive
+    if (blurTimer) {
+      clearTimeout(blurTimer);
+      blurTimer = null;
+    }
     const q = input.value.trim();
-    if (!q || box.classList.contains("is-open")) return;
+    if (!q) {
+      // Empty input → show quick suggestions (history + open tabs)
+      getQuickSuggestions()
+        .then(openSuggestions)
+        .catch(() => {});
+      return;
+    }
+    // Has text → re-fetch Google suggestions
     chrome.runtime
       .sendMessage({ type: "fetch-suggestions", query: q })
       .then((resp) => {
-        if (input.value.trim() === q) openSuggestions(resp.suggestions || []);
+        if (input.value.trim() === q) {
+          const items = (resp.suggestions || []).map((s) => ({
+            text: s,
+            icon: ICON_SEARCH,
+          }));
+          openSuggestions(items);
+        }
       })
       .catch(() => {});
   });
 
   input.addEventListener("blur", () => {
-    setTimeout(closeSuggestions, 150);
+    blurTimer = setTimeout(() => {
+      blurTimer = null;
+      closeSuggestions();
+    }, 180);
   });
 
   box.addEventListener("mousedown", (e) => {
     const item = e.target.closest(".suggestion-item");
     if (!item) return;
     e.preventDefault();
-    navigateToSuggestion(currentSuggestions[Number(item.dataset.index)]);
+    navigateToItem(currentItems[Number(item.dataset.index)]);
   });
 })();
 
@@ -2947,6 +3054,14 @@ function scheduleLiveRerender() {
   if (_rerenderTimer) clearTimeout(_rerenderTimer);
   _rerenderTimer = setTimeout(() => {
     _rerenderTimer = null;
+    // Skip re-render while the command bar is focused — avoids layout shifts
+    // that close the search suggestions dropdown mid-typing.
+    const cmdInput = document.getElementById("commandInput");
+    if (cmdInput && document.activeElement === cmdInput) {
+      // Retry after a short delay; the user may still be typing.
+      scheduleLiveRerender();
+      return;
+    }
     renderDashboard();
   }, 150);
 }

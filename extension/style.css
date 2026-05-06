@@ -1907,6 +1907,13 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
   white-space: nowrap;
 }
 
+.suggestion-sub {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 9px;
+  opacity: 0.7;
+}
+
 .topbar-actions {
   justify-content: flex-end;
   flex-wrap: wrap;
