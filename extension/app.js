@@ -2493,6 +2493,37 @@ document.addEventListener("input", (e) => {
   setLogoPreviewForUrl(url);
 });
 
+const SEARCH_HISTORY_KEY = "commandBarSearchHistory";
+const SEARCH_HISTORY_MAX = 10;
+
+async function saveSearchQuery(query) {
+  const q = (query || "").trim();
+  if (!q) return;
+  try {
+    const data = await chrome.storage.local.get(SEARCH_HISTORY_KEY);
+    let hist = Array.isArray(data[SEARCH_HISTORY_KEY])
+      ? data[SEARCH_HISTORY_KEY]
+      : [];
+    hist = hist.filter((h) => h !== q);
+    hist.unshift(q);
+    if (hist.length > SEARCH_HISTORY_MAX) hist.length = SEARCH_HISTORY_MAX;
+    await chrome.storage.local.set({ [SEARCH_HISTORY_KEY]: hist });
+  } catch {
+    /* ignore */
+  }
+}
+
+async function loadSearchHistory() {
+  try {
+    const data = await chrome.storage.local.get(SEARCH_HISTORY_KEY);
+    return Array.isArray(data[SEARCH_HISTORY_KEY])
+      ? data[SEARCH_HISTORY_KEY]
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 function commandTargetFromInput(value) {
   const query = (value || "").trim();
   if (!query) return "";
@@ -2573,75 +2604,20 @@ function commandTargetFromInput(value) {
   function navigateToItem(item) {
     closeSuggestions();
     if (item.url) {
-      // Direct URL — open it
       chrome.tabs.create({ url: item.url });
     } else {
-      // Search query — go to Google
+      // Search query — save to history then go to Google
+      saveSearchQuery(item.text);
       chrome.tabs.create({
         url: `https://www.google.com/search?q=${encodeURIComponent(item.text)}`,
       });
     }
   }
 
-  /** Build quick-access items from recent history + open tabs (no query needed) */
+  /** Show recent search queries when input is empty (like Google) */
   async function getQuickSuggestions() {
-    const items = [];
-    const seen = new Set();
-
-    // Recent history (last 7 days, top 6)
-    if (chrome.history && chrome.history.search) {
-      try {
-        const history = await chrome.history.search({
-          text: "",
-          maxResults: 20,
-          startTime: Date.now() - 7 * 24 * 60 * 60 * 1000,
-        });
-        for (const h of history) {
-          if (
-            !h.url ||
-            h.url.startsWith("chrome://") ||
-            h.url.startsWith("chrome-extension://")
-          )
-            continue;
-          if (seen.has(h.url)) continue;
-          seen.add(h.url);
-          const title = h.title || friendlyDomain(h.url);
-          items.push({
-            text: title,
-            subtitle: friendlyDomain(h.url),
-            url: h.url,
-            icon: ICON_HISTORY,
-          });
-          if (items.length >= 6) break;
-        }
-      } catch {
-        /* history API might fail */
-      }
-    }
-
-    // Open tabs (top 4 that aren't already listed)
-    const tabs = openTabs
-      .filter((tab) => {
-        if (
-          !tab.url ||
-          tab.url.startsWith("chrome://") ||
-          tab.url.startsWith("chrome-extension://")
-        )
-          return false;
-        return !seen.has(tab.url);
-      })
-      .slice(0, 4);
-    for (const tab of tabs) {
-      const title = tab.title || friendlyDomain(tab.url);
-      items.push({
-        text: title,
-        subtitle: friendlyDomain(tab.url),
-        url: tab.url,
-        icon: ICON_TAB,
-      });
-    }
-
-    return items;
+    const history = await loadSearchHistory();
+    return history.map((q) => ({ text: q, icon: ICON_HISTORY }));
   }
 
   input.addEventListener("input", () => {
@@ -2738,8 +2714,21 @@ document.addEventListener("submit", (e) => {
   if (e.target.id !== "commandForm") return;
   e.preventDefault();
   const input = document.getElementById("commandInput");
-  const target = commandTargetFromInput(input && input.value);
-  if (target) chrome.tabs.create({ url: target });
+  const q = ((input && input.value) || "").trim();
+  const target = commandTargetFromInput(q);
+  if (target) {
+    // Save search query to history (only for non-URL searches)
+    if (
+      q &&
+      !(
+        /^[a-z][a-z0-9+.-]*:/i.test(q) ||
+        /^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/i.test(q)
+      )
+    ) {
+      saveSearchQuery(q);
+    }
+    chrome.tabs.create({ url: target });
+  }
 });
 
 document.addEventListener("submit", async (e) => {
