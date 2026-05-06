@@ -18,7 +18,7 @@ const STRINGS = {
     titleLabel: "Title",
     titlePlaceholder: "Title (optional)",
     favoritesEmpty:
-      "No favorites yet. Hit + to pin a site, or star any tab on the right.",
+      "Your saved sites live here.\nClick + above to add a URL, right-click any webpage to save it, or ⭐ a tab on the right.",
     addAFavorite: "Add a favorite",
     addSection: "Section",
     sectionLabel: "Section",
@@ -124,7 +124,8 @@ const STRINGS = {
     urlLabel: "网址",
     titleLabel: "标题",
     titlePlaceholder: "标题（可选）",
-    favoritesEmpty: "还没有收藏。点击 + 添加链接，或在右侧给标签页标星。",
+    favoritesEmpty:
+      "你的收藏网站会显示在这里。\n点击上方 + 添加网址，右键任意网页可快速收藏，或在右侧点 ⭐ 收藏标签。",
     addAFavorite: "添加收藏",
     addSection: "分组",
     sectionLabel: "分组",

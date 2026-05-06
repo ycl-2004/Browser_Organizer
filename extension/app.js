@@ -380,7 +380,15 @@ async function renderFavoritesColumn() {
   try {
     const sections = await getFavoriteSections();
     const items = await getFavorites();
-    empty.style.display = items.length === 0 ? "block" : "none";
+    if (items.length === 0) {
+      empty.style.display = "block";
+      empty.innerHTML = t("favoritesEmpty")
+        .split("\n")
+        .map((line) => `<p>${escapeHtml(line)}</p>`)
+        .join("");
+    } else {
+      empty.style.display = "none";
+    }
     container.innerHTML = sections
       .sort((a, b) => a.order - b.order)
       .map((section) => renderFavoriteSection(section, items))
@@ -1117,14 +1125,26 @@ async function renderStaticDashboard() {
     openTabsSubSection.style.display = "none";
     if (openTabsSectionCount) openTabsSectionCount.textContent = "";
     if (openTabsSectionAction) openTabsSectionAction.innerHTML = "";
-    const emptyMsg =
+    const emptyTitle =
+      currentLang === "zh" ? "还没有打开的标签" : "No open tabs yet";
+    const emptyTips =
       currentLang === "zh"
-        ? "所有标签已关闭，享受宁静。"
-        : "All tabs closed. Enjoy the calm.";
+        ? [
+            "打开任何网页，它就会自动出现在这里",
+            "标签按域名自动分组，方便管理",
+            "点击 ⭐ 可以收藏，📌 可以固定",
+          ]
+        : [
+            "Open any webpage and it will appear here automatically",
+            "Tabs are grouped by domain for easy browsing",
+            "Click ⭐ to save as favorite, 📌 to pin a tab",
+          ];
     const emptyEl = document.getElementById("openTabsEmptyState");
     if (emptyEl) {
       emptyEl.style.display = "block";
-      emptyEl.innerHTML = `<p class="tabs-empty-text">${emptyMsg}</p>`;
+      emptyEl.innerHTML =
+        `<p class="tabs-empty-title">${emptyTitle}</p>` +
+        `<ul class="tabs-empty-tips">${emptyTips.map((t) => `<li>${t}</li>`).join("")}</ul>`;
     }
   }
   // Hide empty state when there are tabs

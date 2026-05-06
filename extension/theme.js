@@ -16,9 +16,9 @@ async function loadTheme() {
     const theme = await TabHomeStorage.getTheme();
     document.documentElement.dataset.theme = VALID_THEMES.includes(theme)
       ? theme
-      : "light";
+      : "lavender";
   } catch {
-    document.documentElement.dataset.theme = "light";
+    document.documentElement.dataset.theme = "lavender";
   }
   paintThemeToggle();
 }

@@ -1680,6 +1680,40 @@ body.dragging-favorite .favorite-slot-empty.drop-target {
   text-align: center;
 }
 
+.favorites-empty p {
+  margin: 0 0 var(--sp-2);
+}
+
+.favorites-empty p:first-child {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: var(--text-base);
+  margin-bottom: var(--sp-2);
+}
+
+.tabs-empty-title {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: var(--text-base);
+  margin: 0 0 var(--sp-2);
+  text-align: center;
+}
+
+.tabs-empty-tips {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.tabs-empty-tips li::before {
+  content: "→ ";
+  opacity: 0.5;
+}
+
 /* Star + Pin buttons share the same outline/filled pattern. Fill state is
    driven by `.active` class so toggling the class instantly flips between
    hollow and solid, no JS attribute munging. */

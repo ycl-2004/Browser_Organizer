@@ -36,8 +36,8 @@ async function paintHeroTitle() {
 
 function getDefaultHeroCopy() {
   return currentLang === "zh"
-    ? "一个安静的控制台，放下你需要的标签、信任的链接，以及下一件值得做的事。"
-    : "A calm command center for the tabs you need, the links you trust, and the next thing worth doing.";
+    ? "你的标签、收藏与待办，尽在掌握。"
+    : "Your tabs, favorites, and tasks — all in one place.";
 }
 
 async function getStoredHeroCopy() {
