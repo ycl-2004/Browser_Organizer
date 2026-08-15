@@ -11,7 +11,8 @@
     "favicon",
     "bookmarks",
     "readingList",
-    "history"
+    "history",
+    "nativeMessaging"
   ],
   "host_permissions": ["<all_urls>"],
   "content_security_policy": {

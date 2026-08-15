@@ -617,10 +617,13 @@
 
     <!-- Personal config (gitignored) — defines LOCAL_LANDING_PAGE_PATTERNS etc. -->
     <!-- If the file doesn't exist, that's fine — app.js uses sensible defaults. -->
-    <script src="config.local.js"></script>
+    <script src="config.local.js" onerror="this.remove()"></script>
 
     <!-- Shared storage helpers: local-only UI state plus JSON backup / restore -->
     <script src="storage.js"></script>
+
+    <!-- Cross-profile sync via native messaging (silent no-op if host not installed) -->
+    <script src="sync.js"></script>
 
     <!-- Modular scripts — loaded in dependency order before app.js -->
     <script src="i18n.js"></script>

@@ -3095,6 +3095,10 @@ if (chrome.tabs && chrome.tabs.onCreated) {
 if (chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area === "local") {
+      // Skip re-renders while sync.js is importing remote data;
+      // the init sequence (or a manual refresh) will paint everything.
+      if (window.__boSyncPulling && window.__boSyncPulling()) return;
+
       if (
         (changes.favorites || changes.favoriteSections) &&
         !_suppressFavReRender
@@ -3129,6 +3133,10 @@ if (chrome.storage && chrome.storage.onChanged) {
    INITIALIZE
    ---------------------------------------------------------------- */
 (async () => {
+  // Wait for cross-profile sync pull so local storage already contains
+  // the latest shared data before we read and render.
+  if (window.__boSyncReady) await window.__boSyncReady;
+
   await TabHomeStorage.cleanupLegacySyncData();
   await loadLang();
   await loadTheme();
