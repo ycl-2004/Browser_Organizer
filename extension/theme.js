@@ -112,7 +112,10 @@ function applyStaticI18n() {
   set('[data-action="import-data"]', "importData");
 
   // Favorites column
-  set(".favorites-column .panel-heading h2", "favorites");
+  set("#favoritesTitle", "favorites");
+  set("#favoritesSearchInput", "favoriteSearchPlaceholder", "placeholder");
+  setText("#recentFavoritesEyebrow", t("recent"));
+  setText("#recentFavoritesTitle", t("recentFavorites"));
   set("#favoritesAddToggle", "addAFavorite", "title");
   set("#favoriteSectionAdd", "addSection");
   set("#favoritesUrlLabel", "urlLabel");
@@ -162,6 +165,11 @@ function applyStaticI18n() {
   const selectedDayTodoInput = document.getElementById("selectedDayTodoInput");
   if (selectedDayTodoInput)
     selectedDayTodoInput.placeholder = t("plannerAddForDay");
+  const todoQuickInput = document.getElementById("todoQuickInput");
+  if (todoQuickInput) todoQuickInput.placeholder = t("todayTaskPlaceholder");
+  setText("#tabQueueEyebrow", t("continueTitle"));
+  setText("#tabQueueTitle", t("continueTitle"));
+  setText("#savedSessionsTitle", t("savedSessionsTitle"));
   setText(".tabs-column > .panel-heading .eyebrow", dashboardText.nowOpen);
   setText(
     "#openTabsSubSection .compact-section-header h2",

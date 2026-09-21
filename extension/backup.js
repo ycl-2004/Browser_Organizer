@@ -14,6 +14,7 @@ function sanitizeFavoriteForExport(favorite) {
     url: favorite.url,
     title: favorite.title,
     addedAt: favorite.addedAt,
+    ...(favorite.lastOpenedAt ? { lastOpenedAt: favorite.lastOpenedAt } : {}),
     slot: favorite.slot,
     sectionId: favorite.sectionId || "default",
     sectionSlot:
@@ -59,6 +60,7 @@ async function buildExportPayload() {
     favorites,
     favoriteSections,
     storedDailyTasks,
+    tabQueue,
     profileImageDataUrl,
     heroTitle,
     heroCopy,
@@ -67,6 +69,7 @@ async function buildExportPayload() {
     getFavorites(),
     getFavoriteSections(),
     TabHomeStorage.getDailyTasks(),
+    TabHomeStorage.getTabQueue(),
     getProfileImageDataUrl(),
     getStoredHeroTitle(),
     getStoredHeroCopy(),
@@ -84,6 +87,7 @@ async function buildExportPayload() {
       favoriteSections,
       favorites: favorites.map(sanitizeFavoriteForExport),
       dailyTasks: storedDailyTasks.map(sanitizeDailyTaskForExport),
+      tabQueue,
       heroTitle,
       heroCopy,
       profileImageDataUrl: isImageDataUrl(profileImageDataUrl)
@@ -237,6 +241,10 @@ function normalizeImportedFavorites(value, sections) {
             : slot,
       };
 
+      if (typeof favorite.lastOpenedAt === "string" && favorite.lastOpenedAt) {
+        imported.lastOpenedAt = favorite.lastOpenedAt;
+      }
+
       if (isImageDataUrl(favorite.customLogo)) {
         imported.customLogo = favorite.customLogo;
       }
@@ -281,6 +289,44 @@ function normalizeImportedDailyTasks(value) {
     }));
 }
 
+function normalizeImportedTabQueue(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value
+    .filter(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        typeof item.url === "string" &&
+        (item.status === "important" || item.status === "later"),
+    )
+    .map((item, index) => ({
+      id:
+        typeof item.id === "string" && item.id
+          ? item.id
+          : makeId(`queue-${index}`),
+      url: item.url.trim(),
+      title:
+        typeof item.title === "string" && item.title.trim()
+          ? item.title.trim()
+          : item.url.trim(),
+      status: item.status,
+      createdAt:
+        typeof item.createdAt === "string" && item.createdAt
+          ? item.createdAt
+          : new Date().toISOString(),
+      updatedAt:
+        typeof item.updatedAt === "string" && item.updatedAt
+          ? item.updatedAt
+          : new Date().toISOString(),
+    }))
+    .filter((item) => {
+      if (seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
+}
+
 function normalizeImportedLegacyTodos(value) {
   if (!Array.isArray(value)) return [];
   const todayKey = toLocalDateKey(new Date());
@@ -319,6 +365,7 @@ async function importTabHomeDataFromFile(file) {
     const importedDailyTasks = normalizedDailyTasks.length
       ? normalizedDailyTasks
       : normalizeImportedLegacyTodos(data.todos);
+    const importedTabQueue = normalizeImportedTabQueue(data.tabQueue);
     const heroTitle = typeof data.heroTitle === "string" ? data.heroTitle : "";
     const heroCopy = typeof data.heroCopy === "string" ? data.heroCopy : "";
     const profileImageDataUrl = isImageDataUrl(data.profileImageDataUrl)
@@ -333,6 +380,7 @@ async function importTabHomeDataFromFile(file) {
       await setFavorites(favorites);
       dailyTasks = sortDailyTasks(importedDailyTasks);
       await TabHomeStorage.setDailyTasks(dailyTasks);
+      await TabHomeStorage.setTabQueue(importedTabQueue);
       try {
         await chrome.storage.local.remove("todos");
       } catch {}
@@ -355,6 +403,8 @@ async function importTabHomeDataFromFile(file) {
     await paintHeroCopy();
     await paintProfileImage();
     await renderDashboard();
+    renderSavedSessions();
+    updateSaveSessionBtn();
     showToast(t("importDone"));
   } catch (error) {
     console.warn("[wolfy] import failed:", error);

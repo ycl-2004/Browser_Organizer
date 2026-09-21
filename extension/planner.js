@@ -7,6 +7,7 @@ let expandedBookmarkFolders = new Set();
 let dailyTasks = [];
 let selectedPlannerDate; // initialized after toLocalDateKey is defined
 let visiblePlannerMonth; // initialized after startOfMonth is defined
+let plannerOpen = false;
 
 function toLocalDateKey(date) {
   const d = new Date(date);
@@ -362,6 +363,24 @@ function renderDailyPlanner() {
   renderTodayTasks();
   renderCalendarGrid();
   renderSelectedDayPanel();
+  paintPlannerVisibility();
+}
+
+function paintPlannerVisibility() {
+  const planner = document.querySelector(".daily-planner");
+  const toggle = document.querySelector('[data-action="toggle-planner"]');
+  if (!planner) return;
+  planner.classList.toggle("is-open", plannerOpen);
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", plannerOpen ? "true" : "false");
+    toggle.textContent = plannerOpen ? t("hidePlanner") : t("plan");
+    toggle.title = plannerOpen ? t("hidePlanner") : t("plan");
+  }
+}
+
+function togglePlanner() {
+  plannerOpen = !plannerOpen;
+  paintPlannerVisibility();
 }
 
 async function addDailyTask(

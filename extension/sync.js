@@ -26,6 +26,7 @@
     "favorites",
     "favoriteSections",
     "dailyTasks",
+    "tabQueue",
     "heroTitle",
     "heroCopy",
     "profileImageDataUrl",

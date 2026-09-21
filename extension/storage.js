@@ -20,6 +20,7 @@
     lang: "lang",
     theme: "theme",
     tabStatuses: "tabStatuses",
+    tabQueue: "tabQueue",
     savedSessions: "savedSessions",
   };
 
@@ -62,6 +63,10 @@
           : new Date(0).toISOString(),
       slot: typeof value.slot === "number" && value.slot >= 0 ? value.slot : 0,
     };
+
+    if (typeof value.lastOpenedAt === "string" && value.lastOpenedAt) {
+      favorite.lastOpenedAt = value.lastOpenedAt;
+    }
 
     if (typeof value.customLogo === "string" && value.customLogo) {
       favorite.customLogo = value.customLogo;
@@ -176,6 +181,48 @@
   function normalizeDailyTasks(value) {
     if (!Array.isArray(value)) return [];
     return value.map(normalizeDailyTask).filter(Boolean);
+  }
+
+  function normalizeTabQueueItem(value, index = 0) {
+    if (!value || typeof value !== "object") return null;
+    const url = typeof value.url === "string" ? value.url.trim() : "";
+    const status = value.status === "important" || value.status === "later"
+      ? value.status
+      : "";
+    if (!url || !status) return null;
+    const now = new Date().toISOString();
+    return {
+      id:
+        typeof value.id === "string" && value.id
+          ? value.id
+          : `queue-${Date.now()}-${index}`,
+      url,
+      title:
+        typeof value.title === "string" && value.title.trim()
+          ? value.title.trim()
+          : url,
+      status,
+      createdAt:
+        typeof value.createdAt === "string" && value.createdAt
+          ? value.createdAt
+          : now,
+      updatedAt:
+        typeof value.updatedAt === "string" && value.updatedAt
+          ? value.updatedAt
+          : now,
+    };
+  }
+
+  function normalizeTabQueue(value) {
+    if (!Array.isArray(value)) return [];
+    const seen = new Set();
+    return value
+      .map(normalizeTabQueueItem)
+      .filter((item) => {
+        if (!item || seen.has(item.url)) return false;
+        seen.add(item.url);
+        return true;
+      });
   }
 
   async function getFavorites() {
@@ -296,6 +343,17 @@
     });
   }
 
+  async function getTabQueue() {
+    const data = await chrome.storage.local.get(LOCAL_KEYS.tabQueue);
+    return normalizeTabQueue(data[LOCAL_KEYS.tabQueue]);
+  }
+
+  async function setTabQueue(queue) {
+    const normalized = normalizeTabQueue(queue);
+    await chrome.storage.local.set({ [LOCAL_KEYS.tabQueue]: normalized });
+    return normalized;
+  }
+
   root.TabHomeStorage = Object.freeze({
     LOCAL_KEYS,
     META_KEYS,
@@ -305,6 +363,7 @@
     getFavoriteSections,
     getLang,
     getSavedSessions,
+    getTabQueue,
     getTabStatuses,
     getTheme,
     setDailyTasks,
@@ -312,6 +371,7 @@
     setFavoriteSections,
     setLang,
     setSavedSessions,
+    setTabQueue,
     setTabStatuses,
     setTheme,
   });

@@ -72,14 +72,18 @@ On macOS, Chrome's file picker supports `Cmd+Shift+G`; on Windows/Linux, use
 - Drag to reorder, edit from the hover menu, and add custom logos by upload or
   paste.
 - Favicons are fetched and cached locally after the first successful load.
+- Search favorites from the left column and keep a Recent favorites strip based
+  on what you open most often.
 - Right-click any page or link to add it to Browser Organizer.
 
 **Focus area**
 
 - Editable greeting, hero title, subtitle, and profile avatar.
-- Today Task list with tags, recurring tasks, drag-to-reorder, and overdue
-  carry-forward.
-- Daily Planner calendar for planning ahead.
+- Today Task quick-add input with tags, recurring tasks, drag-to-reorder, and
+  overdue carry-forward.
+- A persistent Continue queue brings Important / Later tabs into the center;
+  queued links survive closing the original tab.
+- Daily Planner calendar for planning ahead, collapsed until needed.
 - Optional local weather and location display.
 
 **Open tabs**
@@ -88,15 +92,15 @@ On macOS, Chrome's file picker supports `Cmd+Shift+G`; on Windows/Linux, use
 - Mark tabs as Later or Important; favorite, pin, turn into a task, or close
   them from each tab chip.
 - Detect duplicate URLs and close extras in one click.
-- Select multiple tabs for batch actions and save tab collections as sessions.
+- Select multiple tabs for batch actions and save tab collections as
+  auto-named sessions with one-click Restore.
 
 **Chrome profile and backup**
 
-- View the current profile's native Bookmarks and Reading List.
 - Switch between light, dark, pink, lavender, sky, and sand themes.
 - Toggle English and Chinese.
 - Export and import favorites, sections, tasks, hero copy, avatar, and theme as
-  JSON.
+  JSON, including the Continue queue.
 - Optional macOS Native Messaging support can mirror selected data between
   Chrome profiles on the same machine; the normal extension does not require it.
 
@@ -112,8 +116,9 @@ Open a new tab and start with the three columns:
 4. Use **Export** before moving to another Chrome profile; use **Import** to
    restore the backup.
 
-The top bar also provides search/navigation, **+ New Tab**, theme, language, and
-backup controls.
+The top bar also provides unified search/navigation across favorites, current
+tabs, and Google suggestions, plus **+ New Tab**, theme, language, and backup
+controls. Press **Cmd/Ctrl+K** to focus the command bar.
 
 ## Distribution
 

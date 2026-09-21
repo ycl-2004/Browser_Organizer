@@ -174,7 +174,7 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Pinned places</p>
-              <h2>Favorites</h2>
+              <h2 id="favoritesTitle">Favorites</h2>
             </div>
             <div class="favorites-heading-actions">
               <button
@@ -207,6 +207,25 @@
               </button>
             </div>
           </div>
+
+          <form class="favorites-search" id="favoritesSearchForm" role="search">
+            <label class="sr-only" for="favoritesSearchInput">Search favorites</label>
+            <input
+              id="favoritesSearchInput"
+              type="search"
+              placeholder="Search favorites..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </form>
+
+          <section class="recent-favorites-panel" id="recentFavoritesPanel" hidden>
+            <div class="recent-favorites-heading">
+              <p class="eyebrow" id="recentFavoritesEyebrow">Recent</p>
+              <span id="recentFavoritesTitle">Recent favorites</span>
+            </div>
+            <div class="recent-favorites-list" id="recentFavoritesList"></div>
+          </section>
 
           <!-- Favorite sections — populated by renderFavoritesColumn() -->
           <div class="favorite-sections-list" id="favoriteSectionsList"></div>
@@ -268,6 +287,28 @@
             </div>
             <div class="todo-list todo-list-compact" id="todoList"></div>
 
+            <form class="todo-form todo-quick-form" id="todoQuickForm">
+              <label class="sr-only" for="todoQuickInput">Add today's task</label>
+              <input
+                id="todoQuickInput"
+                type="text"
+                placeholder="What's the next thing to do?"
+                autocomplete="off"
+              />
+              <button type="submit" aria-label="Add today's task">+</button>
+            </form>
+
+            <section class="tab-queue-panel" id="tabQueuePanel" hidden>
+              <div class="panel-heading tab-queue-heading">
+                <div>
+                  <p class="eyebrow" id="tabQueueEyebrow">Continue</p>
+                  <h3 id="tabQueueTitle">Continue</h3>
+                </div>
+                <span class="tab-queue-count" id="tabQueueCount"></span>
+              </div>
+              <div class="tab-queue-list" id="tabQueueList"></div>
+            </section>
+
             <section class="daily-planner" aria-label="Daily planner">
               <div class="daily-planner-header">
                 <div>
@@ -275,6 +316,15 @@
                   <h3 id="plannerMonthLabel">May 2026</h3>
                 </div>
                 <div class="planner-nav">
+                  <button
+                    type="button"
+                    class="planner-toggle-btn"
+                    data-action="toggle-planner"
+                    aria-expanded="false"
+                    aria-controls="dailyPlannerBody"
+                  >
+                    Plan
+                  </button>
                   <button
                     type="button"
                     data-action="planner-prev-month"
@@ -295,44 +345,46 @@
                 </div>
               </div>
 
-              <div class="calendar-grid" id="calendarGrid"></div>
+              <div class="daily-planner-body" id="dailyPlannerBody">
+                <div class="calendar-grid" id="calendarGrid"></div>
 
-              <div class="selected-day-panel">
-                <div class="selected-day-header">
-                  <span id="selectedDateLabel">Selected day</span>
-                  <small id="selectedDateCount">0 tasks</small>
-                </div>
+                <div class="selected-day-panel">
+                  <div class="selected-day-header">
+                    <span id="selectedDateLabel">Selected day</span>
+                    <small id="selectedDateCount">0 tasks</small>
+                  </div>
 
-                <div class="selected-day-tasks" id="selectedDayTasks"></div>
+                  <div class="selected-day-tasks" id="selectedDayTasks"></div>
 
-                <form
-                  class="todo-form selected-day-form"
-                  id="selectedDayTodoForm"
-                >
-                  <input
-                    id="selectedDayTodoInput"
-                    type="text"
-                    placeholder="Add task for selected day..."
-                    autocomplete="off"
-                  />
-                  <select id="selectedDayTodoTagInput" aria-label="Task tag">
-                    <option value="Work">Work</option>
-                    <option value="Projects">Projects</option>
-                    <option value="Personal">Personal</option>
-                    <option value="Design">Design</option>
-                  </select>
-                  <select
-                    id="selectedDayTodoRepeatInput"
-                    aria-label="Repeat"
-                    title="Repeat frequency"
+                  <form
+                    class="todo-form selected-day-form"
+                    id="selectedDayTodoForm"
                   >
-                    <option value="">Once</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekdays">Weekdays</option>
-                    <option value="weekly">Weekly</option>
-                  </select>
-                  <button type="submit" aria-label="Add task">+</button>
-                </form>
+                    <input
+                      id="selectedDayTodoInput"
+                      type="text"
+                      placeholder="Add task for selected day..."
+                      autocomplete="off"
+                    />
+                    <select id="selectedDayTodoTagInput" aria-label="Task tag">
+                      <option value="Work">Work</option>
+                      <option value="Projects">Projects</option>
+                      <option value="Personal">Personal</option>
+                      <option value="Design">Design</option>
+                    </select>
+                    <select
+                      id="selectedDayTodoRepeatInput"
+                      aria-label="Repeat"
+                      title="Repeat frequency"
+                    >
+                      <option value="">Once</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekdays">Weekdays</option>
+                      <option value="weekly">Weekly</option>
+                    </select>
+                    <button type="submit" aria-label="Add task">+</button>
+                  </form>
+                </div>
               </div>
             </section>
           </section>
@@ -437,7 +489,7 @@
           <!-- Saved Sessions -->
           <div class="saved-sessions-panel" id="savedSessionsPanel">
             <div class="section-header compact-section-header">
-              <h2>Saved Sessions</h2>
+              <h2 id="savedSessionsTitle">Saved Sessions</h2>
               <div class="section-line"></div>
               <button
                 class="action-btn"

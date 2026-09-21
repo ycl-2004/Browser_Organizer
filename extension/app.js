@@ -50,6 +50,7 @@ const collapsedDomainCards = new Set();
 let currentTabView = "domain"; // "domain" | "status"
 let batchMode = false;
 const batchSelected = new Map(); // url → tabId
+let favoritesQuery = "";
 
 function updateBatchBar() {
   const bar = document.getElementById("batchBar");
@@ -68,11 +69,11 @@ function updateSaveSessionBtn() {
   const btn = document.getElementById("saveSessionBtn");
   if (!btn) return;
   if (batchMode && batchSelected.size > 0) {
-    btn.textContent = `+ Save ${batchSelected.size} tabs`;
+    btn.textContent = `+ ${t("sessionSaveSelected", batchSelected.size)}`;
     btn.title = `Save ${batchSelected.size} selected tabs as a session`;
   } else {
     const count = getRealTabs().filter((t) => !t.pinned).length;
-    btn.textContent = `+ Save All`;
+    btn.textContent = `+ ${t("sessionSaveAll")}`;
     btn.title = `Save all ${count} open tabs as a session`;
   }
 }
@@ -372,7 +373,61 @@ function renderFavoriteItem(fav) {
     </div>`;
 }
 
-async function renderFavoritesColumn() {
+function favoriteActivityTime(favorite) {
+  const value = favorite?.lastOpenedAt || favorite?.addedAt;
+  const time = value ? Date.parse(value) : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function renderRecentFavorites(favorites, query = "") {
+  const panel = document.getElementById("recentFavoritesPanel");
+  const list = document.getElementById("recentFavoritesList");
+  if (!panel || !list) return;
+
+  if (query.trim() || favorites.length === 0) {
+    panel.hidden = true;
+    list.innerHTML = "";
+    return;
+  }
+
+  const recent = favorites
+    .slice()
+    .sort((a, b) => favoriteActivityTime(b) - favoriteActivityTime(a))
+    .slice(0, 5);
+
+  panel.hidden = recent.length === 0;
+  list.innerHTML = recent
+    .map((favorite) => {
+      const safeId = escapeHtml(favorite.id);
+      const safeUrl = escapeHtml(favorite.url);
+      const safeTitle = escapeHtml(favorite.title || favorite.url);
+      const favicon = getFaviconUrl(favorite.url, 24);
+      return `
+        <button
+          type="button"
+          class="recent-favorite-item"
+          data-action="open-recent-favorite"
+          data-fav-id="${safeId}"
+          data-fav-url="${safeUrl}"
+          title="${safeUrl}"
+        >
+          ${favicon ? `<img src="${favicon}" alt="" />` : `<span class="recent-favorite-favicon"></span>`}
+          <span>${safeTitle}</span>
+        </button>`;
+    })
+    .join("");
+}
+
+async function touchFavorite(id) {
+  if (!id) return;
+  const favorites = await getFavorites();
+  const favorite = favorites.find((item) => item.id === id);
+  if (!favorite) return;
+  favorite.lastOpenedAt = new Date().toISOString();
+  await setFavorites(favorites);
+}
+
+async function renderFavoritesColumn(query = favoritesQuery) {
   const container = document.getElementById("favoriteSectionsList");
   const empty = document.getElementById("favoritesEmpty");
   if (!container || !empty) return;
@@ -380,18 +435,39 @@ async function renderFavoritesColumn() {
   try {
     const sections = await getFavoriteSections();
     const items = await getFavorites();
+    const activeQuery = String(query || "").trim();
+    if (activeQuery !== favoritesQuery.trim()) return;
+    const needle = activeQuery.toLowerCase();
+    const visibleItems = needle
+      ? items.filter((favorite) =>
+          `${favorite.title} ${favorite.url}`.toLowerCase().includes(needle),
+        )
+      : items;
+
+    renderRecentFavorites(items, activeQuery);
+
     if (items.length === 0) {
       empty.style.display = "block";
       empty.innerHTML = t("favoritesEmpty")
         .split("\n")
         .map((line) => `<p>${escapeHtml(line)}</p>`)
         .join("");
+    } else if (visibleItems.length === 0) {
+      empty.style.display = "block";
+      empty.innerHTML = `<p>${escapeHtml(t("favoritesNoMatch"))}</p>`;
     } else {
       empty.style.display = "none";
     }
     container.innerHTML = sections
       .sort((a, b) => a.order - b.order)
-      .map((section) => renderFavoriteSection(section, items))
+      .filter(
+        (section) =>
+          !needle ||
+          visibleItems.some(
+            (favorite) => (favorite.sectionId || "default") === section.id,
+          ),
+      )
+      .map((section) => renderFavoriteSection(section, visibleItems))
       .join("");
   } catch (err) {
     console.warn("[wolfy] Could not load favorites:", err);
@@ -684,6 +760,133 @@ function renderSmartCleanup(tabs, displayTabCount) {
 }
 
 /* ----------------------------------------------------------------
+   CONTINUE QUEUE — persistent bridge between open tabs and today's focus
+   ---------------------------------------------------------------- */
+
+function tabQueueTitle(tab) {
+  return cleanTitle(
+    smartTitle(stripTitleNoise(tab?.title || ""), tab?.url || ""),
+    "",
+  );
+}
+
+async function updateTabQueueItem(url, status, title = url) {
+  if (!url) return;
+  const queue = await TabHomeStorage.getTabQueue();
+  const index = queue.findIndex((item) => item.url === url);
+  const next = queue.slice();
+
+  if (!status) {
+    if (index >= 0) {
+      next.splice(index, 1);
+      await TabHomeStorage.setTabQueue(next);
+    }
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const existing = index >= 0 ? next[index] : null;
+  const item = {
+    id: existing?.id || makeId("queue"),
+    url,
+    title: title || existing?.title || url,
+    status,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+  };
+  if (index >= 0) next[index] = item;
+  else next.unshift(item);
+  await TabHomeStorage.setTabQueue(next);
+}
+
+async function reconcileTabQueue() {
+  const queue = await TabHomeStorage.getTabQueue();
+  const next = queue.slice();
+  let changed = false;
+
+  for (const tab of openTabs) {
+    const status = tabStatuses[tab.url];
+    if (!status || !tab.url) continue;
+    const title = tabQueueTitle(tab);
+    const index = next.findIndex((item) => item.url === tab.url);
+    const now = new Date().toISOString();
+    if (index >= 0) {
+      const item = next[index];
+      if (item.status !== status || item.title !== title) {
+        next[index] = { ...item, status, title, updatedAt: now };
+        changed = true;
+      }
+    } else {
+      next.unshift({
+        id: makeId("queue"),
+        url: tab.url,
+        title,
+        status,
+        createdAt: now,
+        updatedAt: now,
+      });
+      changed = true;
+    }
+  }
+
+  if (changed) return TabHomeStorage.setTabQueue(next);
+  return queue;
+}
+
+function renderTabQueue(queue = []) {
+  const panel = document.getElementById("tabQueuePanel");
+  const list = document.getElementById("tabQueueList");
+  const count = document.getElementById("tabQueueCount");
+  if (!panel || !list || !count) return;
+
+  if (!queue.length) {
+    panel.hidden = true;
+    list.innerHTML = "";
+    count.textContent = "";
+    return;
+  }
+
+  const sorted = queue
+    .slice()
+    .sort((a, b) => {
+      const priority = { important: 0, later: 1 };
+      return (
+        (priority[a.status] ?? 9) - (priority[b.status] ?? 9) ||
+        String(b.updatedAt).localeCompare(String(a.updatedAt))
+      );
+    });
+
+  panel.hidden = false;
+  count.textContent = String(sorted.length);
+  list.innerHTML = sorted
+    .map((item) => {
+      const safeId = escapeHtml(item.id);
+      const safeUrl = escapeHtml(item.url);
+      const safeTitle = escapeHtml(item.title || item.url);
+      const statusLabel = item.status === "important" ? t("important") : t("later");
+      const favicon = getFaviconUrl(item.url, 32);
+      let domainLabel = item.url;
+      try {
+        domainLabel = friendlyDomain(new URL(item.url).hostname);
+      } catch {}
+      return `
+        <div class="tab-queue-item queue-${item.status}" data-queue-id="${safeId}">
+          ${favicon ? `<img class="tab-queue-favicon" src="${favicon}" alt="">` : `<span class="tab-queue-favicon tab-queue-favicon-fallback"></span>`}
+          <div class="tab-queue-item-main">
+            <strong>${safeTitle}</strong>
+            <span>${statusLabel} · ${escapeHtml(domainLabel)}</span>
+          </div>
+          <div class="tab-queue-actions">
+            <button type="button" data-action="open-queue-item" data-queue-id="${safeId}" data-queue-url="${safeUrl}" title="${t("open")}">${t("open")}</button>
+            <button type="button" data-action="queue-to-task" data-queue-id="${safeId}" title="${t("addToToday")}">+</button>
+            <button type="button" data-action="remove-queue-item" data-queue-id="${safeId}" aria-label="${t("dismiss")}" title="${t("dismiss")}">×</button>
+          </div>
+        </div>`;
+    })
+    .join("");
+}
+
+/* ----------------------------------------------------------------
    SAVED SESSIONS
    ---------------------------------------------------------------- */
 let savedSessions = [];
@@ -702,7 +905,7 @@ function renderSavedSessions() {
   if (!panel || !list) return;
 
   if (savedSessions.length === 0) {
-    list.innerHTML = `<div class="session-empty">No saved sessions yet.</div>`;
+    list.innerHTML = `<div class="session-empty">${escapeHtml(t("noSavedSessions"))}</div>`;
     return;
   }
   list.innerHTML = savedSessions
@@ -746,10 +949,10 @@ function renderSavedSessions() {
         <div class="session-favicons">${faviconStack}${moreCount}</div>
         <div class="session-info">
           <span class="session-name" data-action="rename-session" data-session-id="${escapeHtml(s.id)}" title="Click to rename">${escapeHtml(s.name)}</span>
-          <span class="session-meta">${s.tabs.length} tabs · ${dateStr}</span>
+          <span class="session-meta">${escapeHtml(t("nTabsCount", s.tabs.length))} · ${dateStr}</span>
         </div>
         <div class="session-actions">
-          <button class="action-btn" data-action="restore-session" data-session-id="${escapeHtml(s.id)}" title="Restore all tabs">Open</button>
+          <button class="action-btn session-restore-btn" data-action="restore-session" data-session-id="${escapeHtml(s.id)}" title="${escapeHtml(t("sessionRestore"))}">${escapeHtml(t("sessionRestore"))}</button>
           <button class="action-btn close-tabs" data-action="delete-session" data-session-id="${escapeHtml(s.id)}" title="Delete session">${ICONS.close}</button>
         </div>
       </div>
@@ -757,6 +960,25 @@ function renderSavedSessions() {
     </div>`;
     })
     .join("");
+}
+
+function autoNameSession(tabs) {
+  const labels = [];
+  for (const tab of tabs) {
+    let label = "";
+    try {
+      label = friendlyDomain(new URL(tab.url).hostname);
+    } catch {
+      label = tab.title || "";
+    }
+    label = String(label || "").trim();
+    if (label && !labels.includes(label)) labels.push(label);
+  }
+
+  if (labels.length === 0) return t("sessionFallbackName");
+  const shown = labels.slice(0, 3);
+  const remaining = labels.length - shown.length;
+  return `${shown.join(" · ")}${remaining > 0 ? ` +${remaining}` : ""}`;
 }
 
 async function saveCurrentSession() {
@@ -768,7 +990,7 @@ async function saveCurrentSession() {
     tabsToSave = getRealTabs().filter((t) => !t.pinned);
   }
   if (tabsToSave.length === 0) return;
-  const name = `Session (${tabsToSave.length} tabs)`;
+  const name = autoNameSession(tabsToSave);
   const session = {
     id: makeId("sess"),
     name,
@@ -779,18 +1001,18 @@ async function saveCurrentSession() {
   await persistSessions();
   renderSavedSessions();
   if (batchMode) exitBatchMode();
-  showToast(`Session saved — ${tabsToSave.length} tabs`);
+  showToast(t("sessionSaved", tabsToSave.length));
 }
 
 async function restoreSession(id) {
   const session = savedSessions.find((s) => s.id === id);
   if (!session) return;
-  for (const tab of session.tabs) {
-    try {
-      await chrome.tabs.create({ url: tab.url, active: false });
-    } catch {}
-  }
-  showToast(`Restored ${session.tabs.length} tabs`);
+  await Promise.all(
+    session.tabs.map((tab) =>
+      chrome.tabs.create({ url: tab.url, active: false }).catch(() => null),
+    ),
+  );
+  showToast(t("sessionRestored", session.tabs.length));
 }
 
 async function deleteSession(id) {
@@ -1064,6 +1286,8 @@ async function renderStaticDashboard() {
   pinnedDomainGroups = groupTabsByDomain(pinnedDisplayTabs);
   domainGroups = groupTabsByDomain(regularDisplayTabs);
   renderSmartCleanup(realTabs, displayTabs.length);
+  const tabQueue = await reconcileTabQueue();
+  renderTabQueue(tabQueue);
   renderDailyPlanner();
 
   // --- Render domain cards ---
@@ -1218,6 +1442,8 @@ document.addEventListener("click", async (e) => {
     await paintHeroCopy();
     loadAndPaintWeather();
     await renderDashboard();
+    renderSavedSessions();
+    updateSaveSessionBtn();
     await renderProfileLibrary();
     return;
   }
@@ -1270,6 +1496,11 @@ document.addEventListener("click", async (e) => {
     selectedPlannerDate = toLocalDateKey(today);
     visiblePlannerMonth = startOfMonth(today);
     renderDailyPlanner();
+    return;
+  }
+
+  if (action === "toggle-planner") {
+    togglePlanner();
     return;
   }
 
@@ -1472,6 +1703,14 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  if (action === "open-recent-favorite") {
+    const url = actionEl.dataset.favUrl;
+    if (!url) return;
+    void touchFavorite(actionEl.dataset.favId);
+    await chrome.tabs.create({ url });
+    return;
+  }
+
   // ---- Favorites: toggle add modal ----
   if (action === "toggle-favorite-form") {
     const modal = document.getElementById("favoritesModal");
@@ -1661,6 +1900,7 @@ document.addEventListener("click", async (e) => {
   if (action === "batch-mark-later") {
     for (const url of batchSelected.keys()) tabStatuses[url] = "later";
     await TabHomeStorage.setTabStatuses(tabStatuses);
+    await reconcileTabQueue();
     exitBatchMode();
     await renderDashboard();
     return;
@@ -1669,6 +1909,7 @@ document.addEventListener("click", async (e) => {
   if (action === "batch-mark-important") {
     for (const url of batchSelected.keys()) tabStatuses[url] = "important";
     await TabHomeStorage.setTabStatuses(tabStatuses);
+    await reconcileTabQueue();
     exitBatchMode();
     await renderDashboard();
     return;
@@ -1685,6 +1926,40 @@ document.addEventListener("click", async (e) => {
     }
     exitBatchMode();
     if (count > 0) showToast(`Added ${count} tasks`);
+    return;
+  }
+
+  // ---- Persistent Continue queue ----
+  if (action === "open-queue-item") {
+    const url = actionEl.dataset.queueUrl;
+    if (!url) return;
+    const existing = openTabs.find((tab) => tab.url === url);
+    if (existing) await focusTab(url);
+    else await chrome.tabs.create({ url });
+    return;
+  }
+
+  if (action === "queue-to-task") {
+    const queueId = actionEl.dataset.queueId;
+    const queue = await TabHomeStorage.getTabQueue();
+    const item = queue.find((entry) => entry.id === queueId);
+    if (!item) return;
+    const added = await addDailyTask(item.title || item.url, "Web", toLocalDateKey(new Date()));
+    if (added) showToast(t("todoAdded"));
+    return;
+  }
+
+  if (action === "remove-queue-item") {
+    const queueId = actionEl.dataset.queueId;
+    const queue = await TabHomeStorage.getTabQueue();
+    const item = queue.find((entry) => entry.id === queueId);
+    if (!item) return;
+    await TabHomeStorage.setTabQueue(queue.filter((entry) => entry.id !== queueId));
+    if (tabStatuses[item.url]) {
+      delete tabStatuses[item.url];
+      await TabHomeStorage.setTabStatuses(tabStatuses);
+    }
+    await renderDashboard();
     return;
   }
 
@@ -1925,8 +2200,11 @@ document.addEventListener("click", async (e) => {
     const key = action === "mark-tab-later" ? "later" : "important";
     if (tabStatuses[url] === key) {
       delete tabStatuses[url];
+      await updateTabQueueItem(url, "");
     } else {
       tabStatuses[url] = key;
+      const tab = openTabs.find((item) => item.url === url);
+      await updateTabQueueItem(url, key, tabQueueTitle(tab) || url);
     }
     await TabHomeStorage.setTabStatuses(tabStatuses);
     await renderDashboard();
@@ -2064,7 +2342,26 @@ document.addEventListener("dblclick", (e) => {
   }
 });
 
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "favoritesSearchInput") return;
+  favoritesQuery = e.target.value || "";
+  renderFavoritesColumn(favoritesQuery);
+});
+
+document.addEventListener("submit", (e) => {
+  if (e.target.id !== "favoritesSearchForm") return;
+  e.preventDefault();
+});
+
 document.addEventListener("keydown", async (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    const commandInput = document.getElementById("commandInput");
+    commandInput?.focus();
+    commandInput?.select();
+    return;
+  }
+
   const titleEl = e.target.closest && e.target.closest("#heroTitle");
   if (titleEl && titleEl.isContentEditable) {
     if (e.key === "Escape") {
@@ -2571,6 +2868,7 @@ function commandTargetFromInput(value) {
   const ICON_SEARCH = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>`;
   const ICON_HISTORY = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`;
   const ICON_TAB = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>`;
+  const ICON_FAVORITE = "★";
 
   let debounceTimer;
   let blurTimer;
@@ -2624,7 +2922,9 @@ function commandTargetFromInput(value) {
   function navigateToItem(item) {
     closeSuggestions();
     if (item.url) {
-      chrome.tabs.create({ url: item.url });
+      if (item.kind === "favorite") void touchFavorite(item.favoriteId);
+      if (item.kind === "tab") focusTab(item.url);
+      else chrome.tabs.create({ url: item.url });
     } else {
       // Search query — save to history then go to Google
       saveSearchQuery(item.text);
@@ -2634,10 +2934,61 @@ function commandTargetFromInput(value) {
     }
   }
 
-  /** Show recent search queries when input is empty (like Google) */
+  async function getLocalSuggestions(query = "") {
+    const needle = query.trim().toLowerCase();
+    const favorites = await getFavorites();
+    const favoriteItems = favorites
+      .filter((fav) => {
+        if (!needle) return true;
+        return `${fav.title} ${fav.url}`.toLowerCase().includes(needle);
+      })
+      .slice(0, 4)
+      .map((fav) => ({
+        text: fav.title || fav.url,
+        url: fav.url,
+        kind: "favorite",
+        favoriteId: fav.id,
+        icon: ICON_FAVORITE,
+        subtitle: t("searchFavorite"),
+      }));
+    const tabItems = openTabs
+      .filter((tab) => tab.url && !tab.isTabOut)
+      .filter((tab) => {
+        if (!needle) return true;
+        return `${tab.title || ""} ${tab.url}`.toLowerCase().includes(needle);
+      })
+      .slice(0, 4)
+      .map((tab) => ({
+        text: cleanTitle(
+          smartTitle(stripTitleNoise(tab.title || ""), tab.url),
+          "",
+        ),
+        url: tab.url,
+        kind: "tab",
+        icon: ICON_TAB,
+        subtitle: t("searchTab"),
+      }));
+
+    const seen = new Set();
+    return [...tabItems, ...favoriteItems].filter((item) => {
+      if (seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
+  }
+
+  /** Show local destinations and recent searches when input is empty. */
   async function getQuickSuggestions() {
-    const history = await loadSearchHistory();
-    return history.map((q) => ({ text: q, icon: ICON_HISTORY }));
+    const [local, history] = await Promise.all([
+      getLocalSuggestions(),
+      loadSearchHistory(),
+    ]);
+    const recent = history.map((q) => ({
+      text: q,
+      icon: ICON_HISTORY,
+      subtitle: "Search",
+    }));
+    return [...local, ...recent].slice(0, 8);
   }
 
   input.addEventListener("input", () => {
@@ -2652,15 +3003,28 @@ function commandTargetFromInput(value) {
     }
     debounceTimer = setTimeout(async () => {
       try {
-        const resp = await chrome.runtime.sendMessage({
-          type: "fetch-suggestions",
-          query: q,
-        });
+        const [local, resp] = await Promise.all([
+          getLocalSuggestions(q),
+          chrome.runtime.sendMessage({
+            type: "fetch-suggestions",
+            query: q,
+          }),
+        ]);
         if (input.value.trim() === q) {
-          const items = (resp.suggestions || []).map((s) => ({
+          const web = (resp.suggestions || []).map((s) => ({
             text: s,
             icon: ICON_SEARCH,
           }));
+          const seen = new Set(local.map((item) => item.text.toLowerCase()));
+          const items = [
+            ...local,
+            ...web.filter((item) => {
+              const key = item.text.toLowerCase();
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            }),
+          ].slice(0, 8);
           openSuggestions(items);
         }
       } catch {
@@ -2700,15 +3064,26 @@ function commandTargetFromInput(value) {
         .catch(() => {});
       return;
     }
-    // Has text → re-fetch Google suggestions
-    chrome.runtime
-      .sendMessage({ type: "fetch-suggestions", query: q })
-      .then((resp) => {
+    // Has text → show local destinations first, then Google suggestions.
+    Promise.all([
+      getLocalSuggestions(q),
+      chrome.runtime.sendMessage({ type: "fetch-suggestions", query: q }),
+    ]).then(([local, resp]) => {
         if (input.value.trim() === q) {
-          const items = (resp.suggestions || []).map((s) => ({
+          const web = (resp.suggestions || []).map((s) => ({
             text: s,
             icon: ICON_SEARCH,
           }));
+          const seen = new Set(local.map((item) => item.text.toLowerCase()));
+          const items = [
+            ...local,
+            ...web.filter((item) => {
+              const key = item.text.toLowerCase();
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            }),
+          ].slice(0, 8);
           openSuggestions(items);
         }
       })
@@ -2749,6 +3124,18 @@ document.addEventListener("submit", (e) => {
     }
     chrome.tabs.create({ url: target });
   }
+});
+
+document.addEventListener("submit", async (e) => {
+  if (e.target.id !== "todoQuickForm") return;
+  e.preventDefault();
+  const input = document.getElementById("todoQuickInput");
+  if (!input) return;
+  const added = await addDailyTask(input.value, "Work", toLocalDateKey(new Date()));
+  if (!added) return;
+  input.value = "";
+  input.focus();
+  showToast(t("todoAdded"));
 });
 
 document.addEventListener("submit", async (e) => {
@@ -3035,7 +3422,7 @@ function normalizeSectionSlots(favorites, sectionId) {
 
 /* Navigate to a favorite when its card is clicked (now <div> instead of <a>
    to avoid Chrome's broken drag-and-drop for <a> in scrollable containers). */
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const item = e.target.closest(".favorite-item");
   if (!item) return;
   // Don't navigate if clicking the 3-dot menu button
@@ -3047,7 +3434,8 @@ document.addEventListener("click", (e) => {
   }
   const url = item.dataset.favUrl;
   if (url) {
-    chrome.tabs.create({ url });
+    void touchFavorite(item.dataset.favId);
+    await chrome.tabs.create({ url });
   }
 });
 
